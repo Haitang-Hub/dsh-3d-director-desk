@@ -1,3 +1,5 @@
+import { localStoreAvailable, mediaDelete, mediaGetBlob, mediaUpload } from "@/services/local-store";
+
 export interface LocalAssetBinaryRecord {
   key: string;
   blob: Blob;
@@ -74,7 +76,44 @@ export function createIndexedDbLocalAssetBackend(factory: IDBFactory): LocalAsse
 }
 
 function getDefaultBackend() {
-  return typeof indexedDB === "undefined" ? null : createIndexedDbLocalAssetBackend(indexedDB);
+  const idbBackend = typeof indexedDB === "undefined" ? null : createIndexedDbLocalAssetBackend(indexedDB);
+  return createCompositeBackend(idbBackend);
+}
+
+/**
+ * 磁盘优先组合后端：
+ * - put：磁盘可用则落盘；磁盘不可用回退 IndexedDB
+ * - get：磁盘命中直接返回；磁盘缺失回退 IndexedDB，命中则懒迁移上盘
+ * - delete：两边都清
+ */
+function createCompositeBackend(idbBackend: LocalAssetBinaryBackend | null): LocalAssetBinaryBackend | null {
+  if (!idbBackend) return null;
+  return {
+    async put(record) {
+      if (await localStoreAvailable()) {
+        const ok = await mediaUpload(record.key, record.blob, record.fileName).catch(() => false);
+        if (ok) return;
+      }
+      await idbBackend.put(record);
+    },
+    async get(key) {
+      if (await localStoreAvailable()) {
+        const blob = await mediaGetBlob(key).catch(() => null);
+        if (blob) {
+          return { key, blob, fileName: "", mimeType: blob.type || "application/octet-stream", byteLength: blob.size, updatedAt: Date.now() };
+        }
+      }
+      const local = await idbBackend.get(key).catch(() => null);
+      if (local && (await localStoreAvailable())) {
+        void mediaUpload(local.key, local.blob, local.fileName).catch(() => undefined);
+      }
+      return local;
+    },
+    async delete(key) {
+      await idbBackend.delete(key).catch(() => undefined);
+      await mediaDelete(key).catch(() => undefined);
+    },
+  };
 }
 
 export function createLocalAssetBinaryStorage(backend: LocalAssetBinaryBackend | null) {

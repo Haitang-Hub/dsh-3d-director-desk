@@ -24,6 +24,18 @@ pro-components beta 的 peer 依赖声明冲突），然后启动 dev server。
 
 打开 http://localhost:5080 ，点击「新建导演台」进入编辑器。
 
+## 本地文件存储
+
+工程数据默认落盘到项目根目录 `data/`（已 gitignore），不再受浏览器 origin 隔离与清库影响：
+
+- `data/kv/`：导演台列表、场景工程等 localStorage 键值（写透镜像，防抖同步）
+- `data/assets/`：导入的模型/动画等二进制资产（磁盘优先，IndexedDB 回退）
+
+存储服务为 `local-store/`（零依赖 Node 服务，端口 17372，由 `start.bat` 自动启动）。
+服务不在线时自动回退浏览器存储；启动时自动把磁盘上缺失的键值**拉回** localStorage
+（跨浏览器/跨端口数据找回）；IndexedDB 中的旧资产在读取时**懒迁移**上盘。
+换浏览器或换机器时拷贝 `data/` 目录即可找回全部工程。
+
 ## 可选：接入 Canvas Agent
 
 编辑器内置了一个无界面 Agent 桥（`use-director-agent-bridge`）：在 localStorage

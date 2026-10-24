@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { mirroredLocalStorage } from "@/lib/mirrored-storage";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
 import { GEOMETRY_PRIMITIVE_OPTIONS } from "../schema/directorProject";
 import type {
@@ -203,9 +204,7 @@ function isLocalModelLibraryAsset(asset: DirectorAssetRef) {
 }
 
 function getLocalStorageSafe() {
-  if (typeof localStorage === "undefined") return null;
-
-  return localStorage;
+  return mirroredLocalStorage();
 }
 
 function cloneJsonValue<T>(value: T): T {

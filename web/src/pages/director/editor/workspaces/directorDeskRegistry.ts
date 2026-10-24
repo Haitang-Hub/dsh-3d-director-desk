@@ -1,3 +1,5 @@
+import { mirroredLocalStorage } from "@/lib/mirrored-storage";
+
 export interface DirectorDeskRecord {
   id: string;
   name: string;
@@ -12,8 +14,7 @@ const LEGACY_DIRECTOR_SCENE_STORAGE_KEY = "storyai-3d-director-desk-demo";
 const LEGACY_DIRECTOR_SCENE_STORAGE_KEY_PREFIX = `${LEGACY_DIRECTOR_SCENE_STORAGE_KEY}:`;
 
 function getStorageSafe() {
-  if (typeof localStorage === "undefined") return null;
-  return localStorage;
+  return mirroredLocalStorage();
 }
 
 function nowIso() {
