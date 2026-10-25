@@ -3,7 +3,7 @@
  * 模型取自「模型配置」的 text 渠道（resolveModelRequestConfig），与图像/视频生成共用渠道配置。
  */
 
-import { buildApiUrl, resolveModelRequestConfig, useConfigStore, type AiConfig } from "@/stores/use-config-store";
+import { buildApiUrl, decodeChannelModel, resolveModelChannel, useConfigStore } from "@/stores/use-config-store";
 
 export type AgentLlmMessage =
     | { role: "system" | "user" | "assistant"; content: string; tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
@@ -14,27 +14,42 @@ type ChatCompletionResponse = {
     error?: { message?: string };
 };
 
+/**
+ * 解析 Agent 实际使用的模型：模型名必须落在解析到的渠道里——
+ * textModel 是旧值/已失效（如历史遗留的裸模型名）时，退到该渠道第一个 text 模型，
+ * 避免出现「A 渠道的地址 + B 模型名」的错配请求。
+ */
+function resolveAgentModelConfig() {
+    const config = useConfigStore.getState().config;
+    const channel = resolveModelChannel(config, config.textModel);
+    const decoded = decodeChannelModel(config.textModel);
+    const selected = (decoded?.model || config.textModel || "").trim();
+    const matched = channel.models.some((item) => item.name === selected) ? selected : "";
+    const fallback = channel.models.find((item) => item.capability === "text") || channel.models[0];
+    return { config, channel, model: matched || fallback?.name || "" };
+}
+
 export function describeAgentModel(): string {
     try {
-        const config = useConfigStore.getState().config;
-        const requestConfig = resolveModelRequestConfig(config, config.textModel);
-        return requestConfig.model || "未配置";
+        return resolveAgentModelConfig().model || "未配置";
     } catch {
         return "未配置（先在模型配置里添加渠道）";
     }
 }
 
 /** 校验 text 渠道可用并返回请求配置；不可用时抛出带操作提示的错误。 */
-export function resolveAgentRequestConfig(): ReturnType<typeof resolveModelRequestConfig> {
-    const config = useConfigStore.getState().config;
-    const requestConfig = resolveModelRequestConfig(config, config.textModel);
-    if (!requestConfig.baseUrl.trim() || !requestConfig.apiKey.trim()) {
+export function resolveAgentRequestConfig() {
+    const { channel, model } = resolveAgentModelConfig();
+    if (!model) {
+        throw new Error("渠道里还没有可用模型：先在「模型配置」里给渠道添加模型");
+    }
+    if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
         throw new Error("还没有可用的 text 模型渠道：先在「模型配置」里添加渠道（baseUrl + apiKey + 模型）");
     }
-    if (requestConfig.apiFormat !== "openai") {
-        throw new Error(`内置 Agent 暂只支持 openai 格式的 text 渠道，当前渠道是 ${requestConfig.apiFormat} 格式`);
+    if (channel.apiFormat !== "openai") {
+        throw new Error(`内置 Agent 暂只支持 openai 格式的 text 渠道，当前渠道是 ${channel.apiFormat} 格式`);
     }
-    return requestConfig;
+    return { baseUrl: channel.baseUrl, apiKey: channel.apiKey, apiFormat: channel.apiFormat, model };
 }
 
 /** 调用一次 chat/completions；返回 assistant 消息（含文本与工具调用）。 */
@@ -70,7 +85,5 @@ export function parseAgentToolArguments(rawArguments: string): Record<string, un
 
 /** 导出渠道配置读取，供面板展示当前模型名。 */
 export function agentChannelSummary(): string {
-    const config = useConfigStore.getState().config as AiConfig;
-    const channel = resolveModelRequestConfig(config, config.textModel);
-    return channel.model || "";
+    return resolveAgentModelConfig().model;
 }

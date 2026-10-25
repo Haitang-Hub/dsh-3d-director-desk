@@ -372,10 +372,10 @@ export default {
         types: { added: "Added", fixed: "Fixed", changed: "Changed", optimized: "Optimized", docs: "Docs" },
     },
     config: {
-        title: "Settings & Preferences",
+        title: "Model Channels",
         invalidFile: "The settings file format is invalid",
         description: "Providers, model selection, sync, and local storage",
-        modalDescription: "Providers, default models, sync, and local storage",
+        modalDescription: "Manage model providers and keys; import/export supported",
         tabs: {
             channels: "Providers",
             localProxy: "Local proxy",

@@ -23,6 +23,9 @@ export const DIRECTOR_AGENT_SYSTEM_PROMPT = [
     "需要确认构图时 preview_render_frame 出单帧；最终成片用 preview_export_animatic（耗时可达数分钟）。",
     "破坏性操作（stage_clear_scene、stage_remove_object、camera_delete_keyframe）执行前先向用户确认或先 stage_get_state 核对。",
     "回答用中文、简洁；汇报结果时引用返回的对象 ID 与文件名，方便用户在界面上对照。",
+    "输出协议（用户界面只展示进度与结论，过程会被折叠）：",
+    "- 中间轮次（还要继续调用工具时）：只写一行不超过 40 字的进度说明，说明刚完成什么/接下来做什么，不要输出推理、方案罗列或长篇解释；",
+    "- 最终轮次（不再调用工具时）：输出面向用户的最终结论——直接给出结果摘要（做了什么、关键对象 ID/文件名、成片或帧在哪看），简洁分点即可。",
 ].join("\n");
 
 export const DIRECTOR_AGENT_TOOLS: Array<{ type: "function"; function: { name: string; description: string; parameters: AgentToolParameterSchema } }> = [

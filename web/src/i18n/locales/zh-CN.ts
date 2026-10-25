@@ -372,10 +372,10 @@ export default {
         types: { added: "新增", fixed: "修复", changed: "调整", optimized: "优化", docs: "文档" },
     },
     config: {
-        title: "配置与用户偏好",
+        title: "模型渠道配置",
         invalidFile: "配置文件格式不正确",
         description: "渠道聚合、模型选择、同步与本地存储",
-        modalDescription: "渠道聚合、默认模型、同步与本地存储",
+        modalDescription: "管理模型渠道与密钥，配置可导入导出",
         tabs: {
             channels: "渠道",
             localProxy: "本地代理",
