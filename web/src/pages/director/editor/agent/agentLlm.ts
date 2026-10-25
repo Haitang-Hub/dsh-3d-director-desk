@@ -1,6 +1,6 @@
 /**
- * 内置 Agent 的模型调用：OpenAI 兼容 Chat Completions（非流式，带 function calling）。
- * 模型取自「模型配置」的 text 渠道（resolveModelRequestConfig），与图像/视频生成共用渠道配置。
+ * 内置 Agent 的模型调用：OpenAI 兼容 Chat Completions 与 Anthropic 原生 Messages（均非流式、带 function calling）。
+ * 模型取自「模型配置」的 text 渠道；baseUrl 采用带 /v1 的配置方式（buildApiUrl 自动补 /v1）。
  */
 
 import { buildApiUrl, decodeChannelModel, resolveModelChannel, useConfigStore } from "@/stores/use-config-store";
@@ -12,6 +12,18 @@ export type AgentLlmMessage =
 type ChatCompletionResponse = {
     choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }> } }>;
     error?: { message?: string };
+};
+
+type AnthropicResponse = {
+    content?: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }>;
+    error?: { message?: string };
+};
+
+export type AgentRequestConfig = {
+    baseUrl: string;
+    apiKey: string;
+    apiFormat: "openai" | "anthropic";
+    model: string;
 };
 
 /**
@@ -38,7 +50,7 @@ export function describeAgentModel(): string {
 }
 
 /** 校验 text 渠道可用并返回请求配置；不可用时抛出带操作提示的错误。 */
-export function resolveAgentRequestConfig() {
+export function resolveAgentRequestConfig(): AgentRequestConfig {
     const { channel, model } = resolveAgentModelConfig();
     if (!model) {
         throw new Error("渠道里还没有可用模型：先在「模型配置」里给渠道添加模型");
@@ -46,15 +58,19 @@ export function resolveAgentRequestConfig() {
     if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
         throw new Error("还没有可用的 text 模型渠道：先在「模型配置」里添加渠道（baseUrl + apiKey + 模型）");
     }
-    if (channel.apiFormat !== "openai") {
-        throw new Error(`内置 Agent 暂只支持 openai 格式的 text 渠道，当前渠道是 ${channel.apiFormat} 格式`);
+    if (channel.apiFormat !== "openai" && channel.apiFormat !== "anthropic") {
+        throw new Error(`内置 Agent 支持OpenAI 兼容 / Anthropic 协议，当前渠道是 ${channel.apiFormat} 格式`);
     }
     return { baseUrl: channel.baseUrl, apiKey: channel.apiKey, apiFormat: channel.apiFormat, model };
 }
 
-/** 调用一次 chat/completions；返回 assistant 消息（含文本与工具调用）。 */
+/** 调用一次模型；返回 assistant 文本与工具调用（两种协议统一为同一结果形态）。 */
 export async function callAgentLlm(messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
     const requestConfig = resolveAgentRequestConfig();
+    return requestConfig.apiFormat === "anthropic" ? callAnthropicLlm(requestConfig, messages, tools, signal) : callOpenAiLlm(requestConfig, messages, tools, signal);
+}
+
+async function callOpenAiLlm(requestConfig: AgentRequestConfig, messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal) {
     const response = await fetch(buildApiUrl(requestConfig.baseUrl, "/chat/completions"), {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${requestConfig.apiKey.trim()}` },
@@ -70,6 +86,85 @@ export async function callAgentLlm(messages: AgentLlmMessage[], tools: unknown, 
     const toolCalls = (message?.tool_calls || [])
         .filter((call) => call.type === "function" && call.function?.name)
         .map((call) => ({ id: call.id, name: call.function.name, arguments: call.function.arguments || "{}" }));
+    return { content, toolCalls };
+}
+
+/* ---------- Anthropic 原生协议（/v1/messages）---------- */
+
+type AnthropicBlock = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } | { type: "tool_result"; tool_use_id: string; content: string };
+
+/** 把 OpenAI 形态的消息历史转成 Anthropic：system 独立、tool_calls → tool_use、连续 tool 结果合并为 tool_result。 */
+function toAnthropicMessages(messages: AgentLlmMessage[]) {
+    const out: Array<{ role: "user" | "assistant"; content: AnthropicBlock[] }> = [];
+    for (const message of messages) {
+        if (message.role === "system") continue;
+        if (message.role === "user") {
+            out.push({ role: "user", content: [{ type: "text", text: message.content }] });
+            continue;
+        }
+        if (message.role === "assistant") {
+            const blocks: AnthropicBlock[] = [];
+            if (message.content.trim()) blocks.push({ type: "text", text: message.content });
+            for (const call of message.tool_calls || []) {
+                let input: Record<string, unknown> = {};
+                try {
+                    input = JSON.parse(call.function.arguments || "{}");
+                } catch {
+                    input = {};
+                }
+                blocks.push({ type: "tool_use", id: call.id, name: call.function.name, input });
+            }
+            out.push({ role: "assistant", content: blocks });
+            continue;
+        }
+        if (message.role === "tool") {
+            // 工具结果合并进同一条 user 消息（Anthropic 要求 tool_result 紧跟 assistant 的 tool_use）
+            const block: AnthropicBlock = { type: "tool_result", tool_use_id: message.tool_call_id, content: message.content };
+            const last = out[out.length - 1];
+            if (last && last.role === "user" && last.content.every((item) => item.type === "tool_result")) {
+                last.content.push(block);
+            } else {
+                out.push({ role: "user", content: [block] });
+            }
+        }
+    }
+    return out;
+}
+
+async function callAnthropicLlm(requestConfig: AgentRequestConfig, messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal) {
+    const system = messages.filter((message) => message.role === "system").map((message) => message.content).join("\n\n");
+    const anthropicTools = (Array.isArray(tools) ? tools : [])
+        .map((tool) => (tool as { type: "function"; function: { name: string; description: string; parameters: unknown } }).function)
+        .filter(Boolean)
+        .map((fn) => ({ name: fn.name, description: fn.description, input_schema: fn.parameters }));
+    const response = await fetch(buildApiUrl(requestConfig.baseUrl, "/messages"), {
+        method: "POST",
+        headers: {
+            "content-type": "application/json",
+            "x-api-key": requestConfig.apiKey.trim(),
+            "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+            model: requestConfig.model,
+            max_tokens: 8192,
+            ...(system ? { system } : {}),
+            messages: toAnthropicMessages(messages),
+            tools: anthropicTools,
+            tool_choice: { type: "auto" },
+        }),
+        signal,
+    });
+    const payload = (await response.json().catch(() => null)) as AnthropicResponse | null;
+    if (!response.ok || payload?.error?.message) {
+        throw new Error(payload?.error?.message || `模型请求失败（HTTP ${response.status}）`);
+    }
+    const content = (payload?.content || [])
+        .filter((block) => block.type === "text" && block.text)
+        .map((block) => block.text as string)
+        .join("");
+    const toolCalls = (payload?.content || [])
+        .filter((block) => block.type === "tool_use" && block.name && block.id)
+        .map((block) => ({ id: block.id as string, name: block.name as string, arguments: JSON.stringify(block.input ?? {}) }));
     return { content, toolCalls };
 }
 

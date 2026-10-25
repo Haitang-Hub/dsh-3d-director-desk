@@ -7,13 +7,15 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 
-export type ApiCallFormat = "openai" | "gemini";
+export type ApiCallFormat = "openai" | "gemini" | "anthropic";
 export type ModelCapability = "image" | "video" | "text" | "audio";
 export type ReasoningEffort = "auto" | "low" | "medium" | "high" | "xhigh";
 
 export type ChannelModel = {
     name: string;
     capability: ModelCapability;
+    /** 视觉能力（可读图）；仅文本模型使用。 */
+    vision?: boolean;
     script?: string;
 };
 
@@ -549,8 +551,9 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         if (!name || seen.has(name)) continue;
         seen.add(name);
         const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
+        const vision = typeof item === "string" ? undefined : item.vision || undefined;
         const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
-        result.push({ name, capability, script });
+        result.push({ name, capability, vision, script });
     }
     return result;
 }
@@ -726,11 +729,12 @@ function normalizeChannels(config: AiConfig) {
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
     if (apiFormat === "gemini") return GEMINI_BASE_URL;
+    if (apiFormat === "anthropic") return "https://api.anthropic.com";
     return OPENAI_BASE_URL;
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    return apiFormat === "gemini" ? apiFormat : "openai";
+    return apiFormat === "gemini" || apiFormat === "anthropic" ? apiFormat : "openai";
 }
 
 function uniqueModelOptions(models: string[]) {

@@ -1,0 +1,458 @@
+/** 模型渠道配置弹窗：蓝黑主题（深蓝黑底 + 蓝色强调），覆盖在导演台画布之上。 */
+
+.dcfg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(4 8 18 / 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dcfg-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(78vh, 720px);
+  overflow: hidden;
+  border: 1px solid rgb(96 148 255 / 0.28);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgb(13 20 38 / 0.98), rgb(7 11 22 / 0.98));
+  color: rgb(var(--text-rgb));
+  box-shadow:
+    0 24px 80px rgb(0 0 0 / 0.6),
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    inset 0 1px 0 rgb(120 165 255 / 0.08);
+  font-family: inherit;
+}
+
+/* ---------- 头部 ---------- */
+
+.dcfg-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgb(96 148 255 / 0.16);
+  background: linear-gradient(90deg, rgb(34 68 140 / 0.22), transparent 70%);
+}
+
+.dcfg-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  color: rgb(var(--text-rgb));
+}
+
+.dcfg-subtitle {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
+}
+
+/* ---------- 主体 ---------- */
+
+.dcfg-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.dcfg-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dcfg-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(96 148 255 / 0.25);
+}
+
+.dcfg-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dcfg-list-hint {
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.dcfg-channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dcfg-channel-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgb(96 148 255 / 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgb(17 26 48 / 0.55);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.dcfg-channel-card:hover {
+  border-color: rgb(96 148 255 / 0.4);
+  background: rgb(21 33 62 / 0.6);
+}
+
+.dcfg-channel-card.is-active {
+  border-color: rgb(96 148 255 / 0.55);
+  background: rgb(24 40 76 / 0.6);
+}
+
+.dcfg-channel-info {
+  min-width: 0;
+}
+
+.dcfg-channel-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb));
+}
+
+.dcfg-channel-badge {
+  border: 1px solid rgb(96 148 255 / 0.5);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgb(140 180 255);
+  background: rgb(77 143 248 / 0.14);
+  white-space: nowrap;
+}
+
+.dcfg-channel-meta {
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcfg-channel-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.dcfg-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgb(var(--text-muted-rgb));
+}
+
+/* ---------- 渠道编辑器 ---------- */
+
+.dcfg-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dcfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.dcfg-field > span {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.dcfg-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.dcfg-input {
+  width: 100%;
+  border: 1px solid rgb(96 148 255 / 0.25);
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: rgb(var(--text-rgb));
+  background: rgb(9 14 28 / 0.85);
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dcfg-input::placeholder {
+  color: rgb(var(--text-muted-rgb) / 0.7);
+}
+
+.dcfg-input:focus {
+  border-color: rgb(96 148 255 / 0.7);
+  box-shadow: 0 0 0 3px rgb(77 143 248 / 0.15);
+}
+
+.dcfg-input-mono {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.dcfg-key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dcfg-key-row .dcfg-input {
+  flex: 1;
+}
+
+/* 协议分段选择 */
+.dcfg-segmented {
+  display: flex;
+  gap: 4px;
+  border: 1px solid rgb(96 148 255 / 0.25);
+  border-radius: 9px;
+  padding: 3px;
+  background: rgb(9 14 28 / 0.85);
+}
+
+.dcfg-segmented-item {
+  flex: 1;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  color: rgb(var(--text-muted-rgb));
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.dcfg-segmented-item:hover {
+  color: rgb(var(--text-rgb));
+}
+
+.dcfg-segmented-item.is-active {
+  color: #fff;
+  background: rgb(77 143 248 / 0.85);
+}
+
+/* 模型列表 */
+.dcfg-models {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgb(96 148 255 / 0.16);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgb(12 19 36 / 0.5);
+}
+
+.dcfg-models-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dcfg-models-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb));
+}
+
+.dcfg-models-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.dcfg-models-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.dcfg-models-empty {
+  border: 1px dashed rgb(96 148 255 / 0.25);
+  border-radius: 9px;
+  padding: 16px;
+  font-size: 11.5px;
+  text-align: center;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.dcfg-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dcfg-model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgb(96 148 255 / 0.16);
+  border-radius: 9px;
+  padding: 6px 8px;
+  background: rgb(9 14 28 / 0.7);
+}
+
+.dcfg-model-name {
+  flex: 1;
+  border: none;
+  padding: 4px 6px;
+  background: transparent;
+}
+
+.dcfg-model-name:focus {
+  box-shadow: none;
+  border: none;
+}
+
+.dcfg-vision-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
+  cursor: pointer;
+  user-select: none;
+}
+
+.dcfg-vision-toggle input {
+  accent-color: rgb(77 143 248);
+  cursor: pointer;
+}
+
+.dcfg-fetch-error {
+  border: 1px solid rgb(248 113 113 / 0.4);
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 11.5px;
+  color: #fca5a5;
+  background: rgb(127 29 29 / 0.15);
+}
+
+.dcfg-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+/* ---------- 按钮 ---------- */
+
+.dcfg-primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 9px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgb(77 143 248 / 0.9);
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.dcfg-primary-button:hover {
+  background: rgb(96 158 255 / 1);
+}
+
+.dcfg-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgb(96 148 255 / 0.35);
+  border-radius: 9px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  color: rgb(var(--text-rgb));
+  background: rgb(77 143 248 / 0.1);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.dcfg-secondary-button:hover {
+  border-color: rgb(96 148 255 / 0.6);
+  background: rgb(77 143 248 / 0.18);
+}
+
+.dcfg-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dcfg-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  color: rgb(var(--text-muted-rgb));
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.dcfg-icon-button:hover {
+  color: rgb(var(--text-rgb));
+  background: rgb(96 148 255 / 0.18);
+}
+
+.dcfg-icon-button.is-danger:hover {
+  color: #fca5a5;
+  background: rgb(248 113 113 / 0.12);
+}
+
+.dcfg-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.dcfg-spin {
+  animation: dcfg-rotate 0.9s linear infinite;
+}
+
+@keyframes dcfg-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 底部 ---------- */
+
+.dcfg-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px 16px;
+  border-top: 1px solid rgb(96 148 255 / 0.16);
+}
