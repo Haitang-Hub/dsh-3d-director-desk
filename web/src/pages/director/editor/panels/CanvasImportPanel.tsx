@@ -8,9 +8,7 @@ import { useDirectorStore } from "../store/directorStore";
 import { readActiveDirectorDeskId, ensureDirectorDeskRecords } from "../workspaces/directorDeskRegistry";
 import { createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
 import { CanvasNodeType, type CanvasNodeData } from "@/types/canvas";
-import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
-import { uploadImage } from "@/services/image-storage";
-import { uploadMediaFile } from "@/services/file-storage";
+import { canvasBridgeAvailable, appendNodesToRemoteCanvas, uploadRemoteCanvasMedia, readImageMeta, dataUrlToBlob } from "@/lib/canvas-bridge";
 import { nanoid } from "nanoid";
 
 export type DirectorImportTarget = { projectId: string; nodeId: string };
@@ -146,7 +144,6 @@ function buildSceneCompositionText(objects: DirectorObject[], activeCamera: Dire
 // 把文本描述、截图与动作视频导入到打开它的那个画布，并连线到对应的导演台节点。
 export function CanvasImportPanel({ importTarget }: { importTarget: DirectorImportTarget | null }) {
   const project = useDirectorStore((state) => state.project);
-  const hydrated = useCanvasStore((state) => state.hydrated);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<null | "text" | "image" | "fourImage" | "video">(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -154,11 +151,6 @@ export function CanvasImportPanel({ importTarget }: { importTarget: DirectorImpo
   const [exportQuality, setExportQuality] = useState<ReferenceVideoExportQuality>("720p");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    if (!hydrated) void useCanvasStore.persist.rehydrate();
-  }, [hydrated, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -187,31 +179,29 @@ export function CanvasImportPanel({ importTarget }: { importTarget: DirectorImpo
   const importing = busy !== null;
   const canImport = Boolean(importTarget);
 
-  // 新节点放在导演台节点右侧，多次导入依次横向排列，并自动连线到导演台节点。
+  // 新节点写入无限画布工程（经 17371 本地服务直写磁盘），位置在导演台节点右侧并自动连线。
+  // 媒体文件同时上传到无限画布的磁盘媒体库，storageKey 在画布端可直接解析。
   async function appendNodeToCanvas(buildNode: () => CanvasNodeData) {
     if (!importTarget) throw new Error("请从画布中的导演台节点打开后再导入");
-    const store = useCanvasStore.getState();
-    const target = store.projects.find((item) => item.id === importTarget.projectId);
-    if (!target) throw new Error("来源画布不存在，请重新从画布打开导演台");
-
-    const directorNode = target.nodes.find((node) => node.id === importTarget.nodeId);
-    const startX = directorNode ? directorNode.position.x + directorNode.width + 96 : 0;
-    const startY = directorNode ? directorNode.position.y + directorNode.height / 2 : 0;
-    const importedCount = target.nodes.filter((node) => node.metadata?.sourceDirectorNodeId === importTarget.nodeId).length;
+    if (!(await canvasBridgeAvailable())) throw new Error("无法连接无限画布本地服务(17371)，请先启动 infinite-canvas 的 Agent");
 
     const node = buildNode();
-    const placedNode: CanvasNodeData = {
+    const placedNode: Record<string, unknown> = {
       ...node,
-      position: { x: startX + importedCount * (node.width + 40), y: startY - node.height / 2 },
       metadata: { ...node.metadata, sourceDirectorNodeId: importTarget.nodeId },
     };
-    const connection = { id: nanoid(), fromNodeId: importTarget.nodeId, toNodeId: placedNode.id };
-    store.updateProject(importTarget.projectId, {
-      nodes: [...target.nodes, placedNode],
-      connections: [...target.connections, connection],
-    });
-    const targetTitle = useCanvasStore.getState().projects.find((item) => item.id === importTarget.projectId)?.title || "画布";
-    return `已导入画布「${targetTitle}」`;
+    const title = await appendNodesToRemoteCanvas(importTarget.projectId, importTarget.nodeId, [placedNode], [
+      { id: nanoid(), fromNodeId: importTarget.nodeId, toNodeId: node.id },
+    ]);
+    return `已导入画布「${title}」，若画布页面正开着请刷新后查看`;
+  }
+
+  async function uploadScreenshotToCanvas(dataUrl: string, mimeType: string) {
+    const blob = await dataUrlToBlob(dataUrl);
+    const key = `image:${nanoid()}`;
+    const url = await uploadRemoteCanvasMedia(key, blob, mimeType);
+    const meta = await readImageMeta(dataUrl);
+    return imageMetadata({ url, storageKey: key, width: meta.width, height: meta.height, bytes: blob.size, mimeType });
   }
 
   async function handleImportText() {
@@ -240,8 +230,8 @@ export function CanvasImportPanel({ importTarget }: { importTarget: DirectorImpo
       const results = await requestViewportCapture({ preset: "current", source: "canvas-import" });
       const shot = results[0];
       if (!shot) throw new Error("截图失败，请重试");
-      const uploaded = await uploadImage(shot.dataUrl);
-      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Image, { x: 0, y: 0 }, imageMetadata(uploaded)), title: "导演台截图" })));
+      const metadata = await uploadScreenshotToCanvas(shot.dataUrl, "image/png");
+      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Image, { x: 0, y: 0 }, metadata), title: "导演台截图" })));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "导入截图失败");
     } finally {
@@ -296,8 +286,8 @@ async function mergeFourScreenshotsToGrid(
       const results = await requestViewportCapture({ preset: "four", source: "canvas-import" });
       const mergedDataUrl = await mergeFourScreenshotsToGrid(results);
       if (!mergedDataUrl) throw new Error("四方位截图合并失败");
-      const uploaded = await uploadImage(mergedDataUrl);
-      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Image, { x: 0, y: 0 }, imageMetadata(uploaded)), title: "导演台四方位截图" })));
+      const metadata = await uploadScreenshotToCanvas(mergedDataUrl, "image/png");
+      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Image, { x: 0, y: 0 }, metadata), title: "导演台四方位截图" })));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "导入四方位截图失败");
     } finally {
@@ -315,8 +305,10 @@ async function mergeFourScreenshotsToGrid(
         fps: exportFps,
         quality: exportQuality,
       });
-      const uploaded = await uploadMediaFile(result.blob, "video");
-      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Video, { x: 0, y: 0 }, videoMetadata(uploaded)), title: "导演台动作视频" })));
+      const key = `video:${nanoid()}`;
+      const url = await uploadRemoteCanvasMedia(key, result.blob, result.blob.type || "video/mp4");
+      const metadata = videoMetadata({ url, storageKey: key, bytes: result.blob.size, mimeType: result.blob.type || "video/mp4", durationMs: undefined });
+      setStatus(await appendNodeToCanvas(() => ({ ...createCanvasNode(CanvasNodeType.Video, { x: 0, y: 0 }, metadata), title: "导演台动作视频" })));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "导入动作视频失败");
     } finally {
