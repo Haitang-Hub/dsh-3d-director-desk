@@ -3,7 +3,6 @@ import { Bot, ChevronDown, ChevronRight, ChevronUp, Magnet, Send, Trash2, X } fr
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
-import { describeAgentModel } from "./agentLlm";
 import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirectorAgentChat";
 
 /** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置持久化。 */
@@ -112,7 +111,7 @@ function TurnView({ turn }: { turn: AgentTurn }) {
     );
 }
 
-/** 输入区的模型选择行：直接切换 Agent 使用的对话模型（渠道管理走顶栏配置窗口）。 */
+/** 输入框内的模型选择：紧凑无边框下拉，融入输入容器左下角。 */
 function AgentModelRow() {
     const channels = useConfigStore((state) => state.config.channels);
     const textModel = useConfigStore((state) => state.config.textModel);
@@ -136,26 +135,23 @@ function AgentModelRow() {
     }, [hasOptions, textModel, options, updateConfig]);
 
     return (
-        <div className="director-agent-model-row">
-            <Bot aria-hidden="true" size={12} />
-            <select
-                className="director-agent-model-select"
-                value={hasOptions ? textModel : ""}
-                onChange={(event) => updateConfig("textModel", event.target.value)}
-                aria-label="选择模型"
-                title="Agent 使用的对话模型"
-            >
-                {hasOptions ? (
-                    options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))
-                ) : (
-                    <option value="">未配置模型 · 请用顶栏「模型配置」添加渠道</option>
-                )}
-            </select>
-        </div>
+        <select
+            className="director-agent-model-select"
+            value={hasOptions ? textModel : ""}
+            onChange={(event) => updateConfig("textModel", event.target.value)}
+            aria-label="选择模型"
+            title="AI 助手使用的对话模型"
+        >
+            {hasOptions ? (
+                options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))
+            ) : (
+                <option value="">未配置模型 · 请在「模型配置」添加渠道</option>
+            )}
+        </select>
     );
 }
 
@@ -197,7 +193,6 @@ export function DirectorAgentChatPanel() {
     }, [open]);
 
     if (!open) return null;
-    const model = describeAgentModel();
 
     function updateLayout(patch: Partial<PanelLayout>) {
         setLayout((current) => {
@@ -279,7 +274,7 @@ export function DirectorAgentChatPanel() {
             data-dock={docked ? layout.mode : undefined}
             style={floatStyle}
             role="dialog"
-            aria-label="Agent"
+            aria-label="AI 助手"
         >
             <header
                 className="director-agent-panel-header"
@@ -291,10 +286,7 @@ export function DirectorAgentChatPanel() {
             >
                 <span className="director-agent-panel-title">
                     <Bot aria-hidden="true" size={15} className={docked ? "director-agent-panel-dock-hint" : ""} />
-                    <span>
-                        Agent
-                        {showBody ? <span className="director-agent-panel-model"> · {model}</span> : null}
-                    </span>
+                    <span>AI 助手</span>
                 </span>
                 <button type="button" className="director-agent-panel-icon-button" aria-label={layout.collapsed ? "展开面板" : "折叠面板"} title={layout.collapsed ? "展开" : "折叠"} onClick={() => updateLayout({ collapsed: !layout.collapsed })}>
                     {layout.collapsed ? <ChevronUp aria-hidden="true" size={14} /> : <ChevronDown aria-hidden="true" size={14} />}
@@ -307,7 +299,7 @@ export function DirectorAgentChatPanel() {
                         <Trash2 aria-hidden="true" size={14} />
                     </button>
                 ) : null}
-                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 Agent" title="关闭" onClick={() => setOpen(false)}>
+                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 AI 助手" title="关闭" onClick={() => setOpen(false)}>
                     <X aria-hidden="true" size={15} />
                 </button>
             </header>
@@ -323,30 +315,30 @@ export function DirectorAgentChatPanel() {
                                     <li>给活动机位加一个环绕运镜</li>
                                     <li>渲染一帧看看现在的构图</li>
                                 </ul>
-                                对话过程中你只会看到目标进度和最终结论，执行细节可展开「执行过程」查看；模型在下方输入框前切换。
+                                对话过程中你只会看到目标进度和最终结论，执行细节可展开「执行过程」查看；模型在下方输入框内切换。
                             </div>
                         ) : (
                             turns.map((turn) => <TurnView key={turn.id} turn={turn} />)
                         )}
                     </div>
                     <div className="director-agent-panel-composer">
-                        <AgentModelRow />
-                        <div className="director-agent-panel-input-row">
-                            <textarea
-                                className="director-agent-panel-input"
-                                placeholder="描述想要的场景或镜头…"
-                                rows={1}
-                                value={draft}
-                                onChange={(event) => setDraft(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                                        event.preventDefault();
-                                        submit();
-                                    }
-                                }}
-                            />
+                        <textarea
+                            className="director-agent-panel-input"
+                            placeholder="描述想要的场景或镜头…"
+                            rows={2}
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                                    event.preventDefault();
+                                    submit();
+                                }
+                            }}
+                        />
+                        <div className="director-agent-panel-composer-bar">
+                            <AgentModelRow />
                             <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
-                                <Send aria-hidden="true" size={15} />
+                                <Send aria-hidden="true" size={14} />
                             </button>
                         </div>
                     </div>
@@ -356,7 +348,7 @@ export function DirectorAgentChatPanel() {
     );
 }
 
-/** 顶栏「Agent」开关按钮。 */
+/** 顶栏「AI 助手」开关按钮。 */
 export function DirectorAgentChatToggle() {
     const open = useDirectorAgentChat((state) => state.open);
     const toggle = useDirectorAgentChat((state) => state.toggle);
@@ -364,12 +356,12 @@ export function DirectorAgentChatToggle() {
         <button
             className={`top-bar-motion-button${open ? " is-active" : ""}`}
             type="button"
-            aria-label={open ? "关闭 Agent" : "打开 Agent"}
+            aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
             aria-pressed={open}
             onClick={toggle}
         >
             <Bot aria-hidden="true" size={15} />
-            Agent
+            AI 助手
         </button>
     );
 }
