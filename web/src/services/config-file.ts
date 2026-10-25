@@ -6,7 +6,7 @@ import { usePromptSourceStore, type PromptSourceSchedule } from "@/stores/use-pr
 import type { PromptSource } from "@/services/api/prompt-source-presets";
 
 type AppConfigFile = {
-    app: "infinite-canvas";
+    app: "3d-director-desk" | "infinite-canvas";
     version: 1;
     exportedAt: string;
     config: AiConfig;
@@ -20,8 +20,8 @@ type AppConfigFile = {
 export function exportAppConfig() {
     const { config, webdav } = useConfigStore.getState();
     const { sources, schedule } = usePromptSourceStore.getState();
-    const data: AppConfigFile = { app: "infinite-canvas", version: 1, exportedAt: new Date().toISOString(), config, webdav, promptSources: { sources, schedule } };
-    saveAs(new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" }), "infinite-canvas-config.json");
+    const data: AppConfigFile = { app: "3d-director-desk", version: 1, exportedAt: new Date().toISOString(), config, webdav, promptSources: { sources, schedule } };
+    saveAs(new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" }), "director-desk-config.json");
 }
 
 export async function importAppConfig(file: File) {
@@ -31,7 +31,7 @@ export async function importAppConfig(file: File) {
     } catch {
         throw new Error(i18n.t("config.invalidFile"));
     }
-    if (data.app !== "infinite-canvas" || data.version !== 1 || !data.config || !data.webdav || !data.promptSources) throw new Error(i18n.t("config.invalidFile"));
-    useConfigStore.setState({ config: data.config, webdav: data.webdav });
-    usePromptSourceStore.setState(data.promptSources);
+    if (!(data.app === "3d-director-desk" || data.app === "infinite-canvas") || data.version !== 1 || !data.config) throw new Error(i18n.t("config.invalidFile"));
+    useConfigStore.setState({ config: data.config, ...(data.webdav ? { webdav: data.webdav } : {}) });
+    if (data.promptSources) usePromptSourceStore.setState(data.promptSources);
 }

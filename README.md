@@ -47,6 +47,9 @@ pro-components beta 的 peer 依赖声明冲突），然后启动 dev server。
 （旧 `canvas-agent-*` 键仍兼容读取）；探测失败时静默跳过，**纯前端手动编辑不受影响**。
 导演台首页右上有「AI 桥在线/离线」徽标。
 
+编辑器顶栏还有「AI 助手」内置聊天面板：直连「模型配置」（设置齿轮）里的 text 渠道，
+不依赖外部 harness 也能在页面内对话编排；工具执行与 MCP 同源。
+
 harness 侧注册（前提：`start.bat` 已启动）：
 
 ```json
@@ -57,6 +60,9 @@ harness 侧注册（前提：`start.bat` 已启动）：
     }
 }}
 ```
+
+无法拉起 stdio 进程的 harness 可改用 HTTP 传输：`POST http://127.0.0.1:17372/mcp`
+（无状态 JSON-RPC）；编排技能文档在 `GET http://127.0.0.1:17372/skills/director-desk`。
 
 典型工作流：`stage_list_presets` 查预设 → `stage_place_character`/`stage_place_prop`
 摆场 → `camera_apply_preset`/`camera_set_keyframe` 设运镜 → `preview_render_frame`
@@ -84,5 +90,6 @@ node bridge-selftest.js  # 桥全回路自测
 
 ## 后续演进
 
+- 配置与工程文件支持导入导出（设置弹窗与首页卡片）
 - 状态类工具的服务端直写（executor 离线时直接改写 `data/kv/` 场景工程）
 - 常驻无头浏览器作为渲染 worker（批量出片编排），见 `修改方案.md` 阶段三。

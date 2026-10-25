@@ -40,6 +40,8 @@ SSE 下行事件：
 | `GET /bootstrap` | 自动发现：`{ ok, name: "director-desk", version, protocolVersion }`。web 端未显式配置时探测此端点。 |
 | `POST /director/tool` | body `{ name, input, desk? }`。同步等待 executor 回传。`desk` 空表示任意可用 executor。 |
 | `GET /director/status` | executor 在线概况（doctor / 状态徽标用）。 |
+| `POST /mcp` | MCP over HTTP（streamable HTTP 的无状态子集）：initialize / tools/list / tools/call / ping。外部 harness 无法拉起 stdio 进程时用这个门面。 |
+| `GET /skills` / `GET /skills/:name` | skill 文档下发（随包内置 `director-mcp/skills/`，当前含 director-desk 编排技能）。 |
 
 ### 路由与并发
 
@@ -86,10 +88,22 @@ three.js 实时渲染，必须由 executor 执行；executor 离线时返回 `ex
 }}
 ```
 
-stdio MCP 门面为手写最小 JSON-RPC 2.0（零依赖），实现 `initialize` / `tools/list` /
-`tools/call` / `ping`；工具调用转发到常驻桥 `/director/tool`。环境变量：
-`DIRECTOR_BRIDGE_URL`（默认 http://127.0.0.1:17372）、`DIRECTOR_DESK`（固定路由 desk）。
+MCP 门面有两种传输：stdio（`node director-mcp/index.js mcp`，DeepSeek harness 可拉起
+进程时用）与 HTTP（`POST 127.0.0.1:17372/mcp`，浏览器内嵌 harness 用），实现相同的
+`initialize` / `tools/list` / `tools/call` / `ping`，工具调用都转发到常驻桥
+`/director/tool`。环境变量：`DIRECTOR_BRIDGE_URL`、`DIRECTOR_DESK`（固定路由 desk）。
 注意 `preview_export_animatic` 可达数分钟，调用方需设置足够超时。
+
+编排方法论以 skill 形式提供：`GET http://127.0.0.1:17372/skills/director-desk`
+（同一份内容也是编辑器内置 Agent 的 system prompt 蓝本）。
+
+## 编辑器内置 Agent（web 内直连模型）
+
+除 MCP 外，编辑器顶栏「AI 助手」提供页面内聊天面板
+（`web/src/pages/director/editor/agent/`）：直连「模型配置」中 text 渠道
+（OpenAI 兼容 chat/completions，function calling 循环），工具执行复用与 SSE 桥
+相同的 `runDirectorTool`，因此内置 Agent、外部 harness、MCP 三条链路行为一致。
+工具表的 web 侧副本在 `editor/agent/agentTools.ts`（与 director-mcp schema 对齐）。
 
 ## 自检
 

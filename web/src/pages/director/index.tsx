@@ -1,7 +1,7 @@
 import "./styles/index.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowRight, BookOpen, Boxes, Check, Clock3, Hand, Keyboard, MousePointer2, Plus, Sparkles, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowRight, BookOpen, Boxes, Check, Clock3, Download, Hand, Keyboard, MousePointer2, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
 import { useThemeStore } from "@/stores/use-theme-store";
 import {
   createDirectorDeskRecord,
@@ -15,6 +15,9 @@ import {
   type DirectorDeskRecord,
 } from "./editor/workspaces/directorDeskRegistry";
 import { getPerformanceBenchmarkMode } from "./editor/performance/performanceBenchmark";
+import { parseProject } from "./editor/io/importProjectJson";
+import { serializeProject } from "./editor/io/exportProjectJson";
+import { isDirectorProjectShape } from "./editor/io/projectDocument";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
 const HOME_QUICK_START_STEPS = [
@@ -118,6 +121,33 @@ function formatDirectorDeskUpdatedAt(value: string) {
   }).format(new Date(timestamp));
 }
 
+/** 场景持久化键前缀（与 directorStore 保持一致）。 */
+const DIRECTOR_SCENE_STORAGE_KEY_PREFIX = "storyai-3d-director-desk-demo:";
+
+function readDeskProject(deskId: string) {
+  for (const key of [`${DIRECTOR_SCENE_STORAGE_KEY_PREFIX}${deskId}`, "storyai-3d-director-desk-demo"]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { project?: unknown };
+      if (isDirectorProjectShape(parsed?.project)) return parsed.project;
+    } catch {
+      // 单键损坏不影响其余
+    }
+  }
+  return null;
+}
+
+function downloadJson(text: string, fileName: string) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function DirectorPage() {
   const navigate = useNavigate();
   const theme = useThemeStore((state) => state.theme);
@@ -172,6 +202,34 @@ export default function DirectorPage() {
     navigate({ pathname: "/director/editor", search: `?instanceId=${encodeURIComponent(record.id)}` });
   }
 
+  function handleExportDesk(desk: DirectorDeskRecord) {
+    const project = readDeskProject(desk.id);
+    if (!project) {
+      window.alert(`「${desk.name}」还没有可导出的场景数据`);
+      return;
+    }
+    downloadJson(serializeProject(project), `${desk.name || "导演台"}.director-project.json`);
+  }
+
+  function handleImportProjectFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    void file.text().then((text) => {
+      try {
+        const project = parseProject(text);
+        const record = createDirectorDeskRecord(records, file.name.replace(/\.director-project\.json$|\.json$/i, ""));
+        const nextRecords = [...records, record];
+        writeDirectorDeskRecords(nextRecords);
+        setRecords(nextRecords);
+        writeActiveDirectorDeskId(record.id);
+        localStorage.setItem(`storyai-3d-director-desk-demo:${record.id}`, JSON.stringify({ project }));
+      } catch {
+        window.alert("工程文件解析失败：请确认是导演台导出的 .json 工程");
+      }
+    });
+  }
+
   function handleDeleteDesk(desk: DirectorDeskRecord) {
     if (!window.confirm(`删除「${desk.name}」？这个导演台里的本地场景也会一起删除。`)) return;
 
@@ -213,6 +271,11 @@ export default function DirectorPage() {
               <Plus aria-hidden="true" size={18} />
               新建导演台
             </button>
+            <label className="director-home-scroll-hint" role="button" tabIndex={0} aria-label="导入工程文件">
+              <Upload aria-hidden="true" size={14} />
+              导入工程
+              <input type="file" accept="application/json,.json" className="hidden" onChange={handleImportProjectFile} />
+            </label>
             <a className="director-home-scroll-hint" href="#director-home-guide-title">
               向下查看使用说明
               <ArrowDown aria-hidden="true" size={14} />
@@ -241,14 +304,25 @@ export default function DirectorPage() {
                   <span className="director-home-card-index">{String(index + 1).padStart(2, "0")}</span>
                   <ArrowRight className="director-home-card-arrow" aria-hidden="true" size={18} />
                 </button>
-                <button
-                  className="director-home-card-delete"
-                  type="button"
-                  aria-label={`删除${desk.name}`}
-                  onClick={() => handleDeleteDesk(desk)}
-                >
-                  <Trash2 aria-hidden="true" size={15} strokeWidth={1.9} />
-                </button>
+                <div className="director-home-card-actions">
+                  <button
+                    className="director-home-card-export"
+                    type="button"
+                    aria-label={`导出${desk.name}`}
+                    title="导出工程文件"
+                    onClick={() => handleExportDesk(desk)}
+                  >
+                    <Download aria-hidden="true" size={15} strokeWidth={1.9} />
+                  </button>
+                  <button
+                    className="director-home-card-delete"
+                    type="button"
+                    aria-label={`删除${desk.name}`}
+                    onClick={() => handleDeleteDesk(desk)}
+                  >
+                    <Trash2 aria-hidden="true" size={15} strokeWidth={1.9} />
+                  </button>
+                </div>
               </article>
             ))}
           </section>

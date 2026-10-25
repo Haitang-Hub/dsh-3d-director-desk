@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+import { mirroredLocalStorage } from "@/lib/mirrored-storage";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
@@ -478,6 +480,8 @@ export const useConfigStore = create<ConfigStore>()(
         }),
         {
             name: CONFIG_STORE_KEY,
+            // 写透镜像到本地文件存储（director-mcp /kv），服务离线时自动回退纯 localStorage
+            storage: createJSONStorage(() => mirroredLocalStorage() as Storage),
             partialize: (state) => ({ config: state.config, webdav: state.webdav }),
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;

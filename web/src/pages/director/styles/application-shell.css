@@ -279,11 +279,17 @@
   transform: translateX(3px);
 }
 
-.director-home-card-delete {
+.director-home-card-actions {
   position: absolute;
   top: 14px;
   right: 14px;
   z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
+.director-home-card-delete,
+.director-home-card-export {
   display: grid;
   place-items: center;
   width: 32px;
@@ -293,6 +299,14 @@
   color: rgb(var(--text-muted-rgb));
   background: rgb(var(--surface-rgb) / 0.72);
   opacity: 0.72;
+  transition:
+    opacity 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.director-home-card-delete {
   transform: translateY(0);
   transition:
     border-color 0.18s ease,
@@ -302,8 +316,14 @@
     transform 0.18s ease;
 }
 
+.director-home-card-export:hover {
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--accent-rgb) / 0.14);
+}
+
 .director-home-card:hover .director-home-card-delete,
-.director-home-card:focus-within .director-home-card-delete {
+.director-home-card:focus-within .director-home-card-actions {
   opacity: 1;
   transform: translateY(0);
 }
@@ -792,10 +812,16 @@
 
 .top-bar-left,
 .top-bar-center,
+.top-bar-right,
 .top-bar-actions {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.top-bar-right {
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .top-bar-center {

@@ -1,12 +1,15 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Route, X } from "lucide-react";
+import { Route, Settings2, X } from "lucide-react";
+import { AppConfigModal } from "@/components/layout/app-config-modal";
+import { useConfigStore } from "@/stores/use-config-store";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
 import { ExportPanel } from "./editor/panels/ExportPanel";
 import { CanvasImportPanel } from "./editor/panels/CanvasImportPanel";
+import { DirectorAgentChatPanel, DirectorAgentChatToggle } from "./editor/agent/DirectorAgentChatPanel";
 import {
   clearDirectorDeskHostBridge,
   initDirectorDeskHostBridge,
@@ -171,8 +174,9 @@ export default function DirectorEditorPage() {
   }
 
   return (
-    <div className="h-dvh w-full overflow-hidden">
+    <div className="relative h-dvh w-full overflow-hidden">
       <DirectorAgentBridge />
+      <DirectorAgentChatPanel />
       <div className="director-desk-app" data-theme="dark">
         <div className="app-shell">
           <header className="top-bar">
@@ -239,17 +243,30 @@ export default function DirectorEditorPage() {
               <CanvasImportPanel importTarget={importTarget} />
               <ExportPanel />
             </div>
-            {motionStudioOpen ? null : (
-              <button className="director-close-button" type="button" title="关闭" onClick={(e) => { e.stopPropagation(); handleBack(); }}>
-                <X aria-hidden="true" size={18} strokeWidth={2} />
+            <div className="top-bar-right">
+              <DirectorAgentChatToggle />
+              <button
+                className="top-bar-motion-button"
+                type="button"
+                aria-label="打开模型配置"
+                title="模型配置"
+                onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
+              >
+                <Settings2 aria-hidden="true" size={15} />
               </button>
-            )}
+              {motionStudioOpen ? null : (
+                <button className="director-close-button" type="button" title="关闭" onClick={(e) => { e.stopPropagation(); handleBack(); }}>
+                  <X aria-hidden="true" size={18} strokeWidth={2} />
+                </button>
+              )}
+            </div>
           </header>
           <DirectorDeskShell>
             <DirectorCanvas />
           </DirectorDeskShell>
         </div>
       </div>
+      <AppConfigModal />
     </div>
   );
 }
