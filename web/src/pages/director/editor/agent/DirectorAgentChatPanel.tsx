@@ -71,6 +71,22 @@ export function DirectorAgentChatPanel() {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages.length, activity, sending]);
 
+    // 唤出保险：持久化的浮动位置若落在当前视口外（换窗口/屏幕尺寸后），自动拉回可见区域
+    useEffect(() => {
+        if (!open) return;
+        setLayout((current) => {
+            if (current.mode !== "float") return current;
+            // 面板高度是 min(72vh, 680px)，钳制 top 使整个面板落在视口内
+            const panelHeight = Math.min(window.innerHeight * 0.72, 680);
+            const x = Math.min(Math.max(current.x, 8), Math.max(8, window.innerWidth - FLOAT_WIDTH - 8));
+            const y = Math.min(Math.max(current.y, 8), Math.max(8, window.innerHeight - panelHeight - 8));
+            if (x === current.x && y === current.y) return current;
+            const next = { ...current, x, y };
+            saveLayout(next);
+            return next;
+        });
+    }, [open]);
+
     if (!open) return null;
     const model = describeAgentModel();
 
