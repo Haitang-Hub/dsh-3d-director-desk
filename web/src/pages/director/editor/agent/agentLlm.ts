@@ -15,9 +15,13 @@ type ChatCompletionResponse = {
 };
 
 export function describeAgentModel(): string {
-    const config = useConfigStore.getState().config;
-    const requestConfig = resolveModelRequestConfig(config, config.textModel);
-    return requestConfig.model || "未配置";
+    try {
+        const config = useConfigStore.getState().config;
+        const requestConfig = resolveModelRequestConfig(config, config.textModel);
+        return requestConfig.model || "未配置";
+    } catch {
+        return "未配置（先在模型配置里添加渠道）";
+    }
 }
 
 /** 校验 text 渠道可用并返回请求配置；不可用时抛出带操作提示的错误。 */

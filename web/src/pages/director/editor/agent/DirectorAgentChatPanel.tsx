@@ -25,13 +25,14 @@ export function DirectorAgentChatPanel() {
     const { open, sending, messages, activity, toggle, setOpen, clear, send } = useDirectorAgentChat();
     const [draft, setDraft] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
-    const model = describeAgentModel();
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages.length, activity, sending]);
 
     if (!open) return null;
+    // 仅在面板打开时读取渠道信息，且读取失败不阻塞面板渲染
+    const model = describeAgentModel();
 
     function submit() {
         const text = draft.trim();
