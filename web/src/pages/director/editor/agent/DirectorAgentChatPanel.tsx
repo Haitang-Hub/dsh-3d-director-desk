@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, ChevronDown, ChevronUp, Magnet, Send, Trash2, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, Magnet, Plus, Send, Settings2, Trash2, X } from "lucide-react";
+
+import { createModelChannel, encodeChannelModel, guessCapability, modelOptionsFromChannels, normalizeModelOptionValue, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
 import { describeAgentModel } from "./agentLlm";
 import { useDirectorAgentChat } from "./useDirectorAgentChat";
@@ -34,6 +36,16 @@ function saveLayout(layout: PanelLayout) {
     }
 }
 
+/** 面板收起时的右下角浮动入口。 */
+function AgentLauncher({ onClick }: { onClick: () => void }) {
+    return (
+        <button type="button" className="director-agent-launcher" onClick={onClick} aria-label="打开 AI 助手">
+            <Bot aria-hidden="true" size={16} />
+            AI 助手
+        </button>
+    );
+}
+
 /** 渲染一行工具执行记录（默认折叠为单行 chip，点击展开）。 */
 function ToolChip({ name, summary, failed }: { name?: string; summary?: string; failed?: boolean }) {
     const [expanded, setExpanded] = useState(false);
@@ -50,7 +62,127 @@ function ToolChip({ name, summary, failed }: { name?: string; summary?: string; 
     );
 }
 
-/** 导演台内置 Agent 聊天面板：自由拖拽 + 左右磁性吸附的浮动窗口。 */
+/** 模型配置视图：选择 text 模型 + 渠道管理（新增/编辑/删除）。 */
+function AgentModelConfig() {
+    const config = useConfigStore((state) => state.config);
+    const updateConfig = useConfigStore((state) => state.updateConfig);
+    const [expandedChannelId, setExpandedChannelId] = useState("");
+
+    /** 渠道变更统一入口：同步渠道表、模型清单，并把 textModel 归一到仍存在的选项。 */
+    function applyChannels(channels: ModelChannel[]) {
+        updateConfig("channels", channels);
+        updateConfig("models", modelOptionsFromChannels(channels));
+        updateConfig("textModel", normalizeModelOptionValue(config.textModel, channels));
+    }
+
+    // 只列 text 类模型；渠道里没有标注 text 的模型时整渠道兜底显示（capability 猜测可能不准）
+    const textModelsOf = (channel: ModelChannel) => {
+        const text = channel.models.filter((model) => model.capability === "text");
+        return text.length ? text : channel.models;
+    };
+
+    function updateChannel(id: string, patch: Partial<ModelChannel>) {
+        applyChannels(config.channels.map((channel) => (channel.id === id ? { ...channel, ...patch } : channel)));
+    }
+
+    function addChannel() {
+        const channel = createModelChannel({ name: `渠道 ${config.channels.length + 1}` });
+        applyChannels([...config.channels, channel]);
+        setExpandedChannelId(channel.id);
+    }
+
+    function deleteChannel(id: string) {
+        if (config.channels.length <= 1) return;
+        applyChannels(config.channels.filter((channel) => channel.id !== id));
+    }
+
+    return (
+        <div className="director-agent-config">
+            <section className="director-agent-config-section">
+                <h4>对话模型</h4>
+                <select className="director-agent-control" value={config.textModel} onChange={(event) => updateConfig("textModel", event.target.value)} aria-label="选择对话模型">
+                    {config.channels.flatMap((channel) => {
+                        const models = textModelsOf(channel);
+                        return models.length ? (
+                            <optgroup key={channel.id} label={channel.name || "未命名渠道"}>
+                                {models.map((model) => (
+                                    <option key={model.name} value={encodeChannelModel(channel.id, model.name)}>
+                                        {model.name}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        ) : [];
+                    })}
+                </select>
+                <p className="director-agent-config-note">AI 助手的对话与工具调用都走这个模型。</p>
+            </section>
+
+            <section className="director-agent-config-section">
+                <div className="director-agent-config-section-head">
+                    <h4>渠道</h4>
+                    <button type="button" className="director-agent-panel-icon-button" aria-label="新增渠道" title="新增渠道" onClick={addChannel}>
+                        <Plus aria-hidden="true" size={14} />
+                    </button>
+                </div>
+                <div className="director-agent-config-channels">
+                    {config.channels.map((channel) => {
+                        const expanded = expandedChannelId === channel.id;
+                        return (
+                            <div key={channel.id} className={`director-agent-channel${expanded ? " is-expanded" : ""}`}>
+                                <div className="director-agent-channel-head" role="button" tabIndex={0} onClick={() => setExpandedChannelId(expanded ? "" : channel.id)} onKeyDown={(event) => event.key === "Enter" && setExpandedChannelId(expanded ? "" : channel.id)}>
+                                    <span className="director-agent-channel-name">{channel.name || "未命名渠道"}</span>
+                                    <span className="director-agent-channel-meta">{channel.models.length} 个模型 · {channel.apiFormat === "gemini" ? "Gemini" : "OpenAI"}</span>
+                                    <button
+                                        type="button"
+                                        className="director-agent-panel-icon-button"
+                                        aria-label={`删除渠道 ${channel.name || ""}`}
+                                        disabled={config.channels.length <= 1}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            deleteChannel(channel.id);
+                                        }}
+                                    >
+                                        <Trash2 aria-hidden="true" size={13} />
+                                    </button>
+                                </div>
+                                {expanded ? (
+                                    <div className="director-agent-channel-body">
+                                        <label className="director-agent-field">
+                                            <span>名称</span>
+                                            <input className="director-agent-control" value={channel.name} onChange={(event) => updateChannel(channel.id, { name: event.target.value })} />
+                                        </label>
+                                        <label className="director-agent-field">
+                                            <span>Base URL</span>
+                                            <input className="director-agent-control" placeholder="https://api.deepseek.com" value={channel.baseUrl} onChange={(event) => updateChannel(channel.id, { baseUrl: event.target.value })} />
+                                        </label>
+                                        <label className="director-agent-field">
+                                            <span>API Key</span>
+                                            <input className="director-agent-control" type="password" autoComplete="off" value={channel.apiKey} onChange={(event) => updateChannel(channel.id, { apiKey: event.target.value })} />
+                                        </label>
+                                        <label className="director-agent-field">
+                                            <span>接口格式</span>
+                                            <select className="director-agent-control" value={channel.apiFormat} onChange={(event) => updateChannel(channel.id, { apiFormat: event.target.value === "gemini" ? "gemini" : "openai" })}>
+                                                <option value="openai">OpenAI 兼容</option>
+                                                <option value="gemini">Gemini</option>
+                                            </select>
+                                        </label>
+                                        <label className="director-agent-field">
+                                            <span>模型（每行一个）</span>
+                                            <textarea className="director-agent-control" rows={3} value={channel.models.map((model) => model.name).join("\n")} onChange={(event) => updateChannel(channel.id, { models: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean).map((name) => ({ name, capability: guessCapability(name) })) })} />
+                                        </label>
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="director-agent-config-note">渠道配置保存后立即生效（本地存储，随 data/ 落盘）。</p>
+            </section>
+        </div>
+    );
+}
+
+/** 导演台内置 Agent 聊天面板：自由拖拽 + 左右磁性吸附的浮动窗口，内置模型配置。 */
 export function DirectorAgentChatPanel() {
     const open = useDirectorAgentChat((state) => state.open);
     const sending = useDirectorAgentChat((state) => state.sending);
@@ -62,6 +194,7 @@ export function DirectorAgentChatPanel() {
 
     const [layout, setLayout] = useState<PanelLayout>(loadLayout);
     const [dragging, setDragging] = useState(false);
+    const [showConfig, setShowConfig] = useState(false);
     const [draft, setDraft] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
@@ -87,7 +220,7 @@ export function DirectorAgentChatPanel() {
         });
     }, [open]);
 
-    if (!open) return null;
+    if (!open) return <AgentLauncher onClick={() => setOpen(true)} />;
     const model = describeAgentModel();
 
     function updateLayout(patch: Partial<PanelLayout>) {
@@ -187,13 +320,16 @@ export function DirectorAgentChatPanel() {
                         {showBody ? <span className="director-agent-panel-model"> · {model}</span> : null}
                     </span>
                 </span>
+                <button type="button" className={`director-agent-panel-icon-button${showConfig ? " is-active" : ""}`} aria-label={showConfig ? "返回对话" : "模型配置"} title={showConfig ? "返回对话" : "模型配置"} onClick={() => setShowConfig((value) => !value)}>
+                    <Settings2 aria-hidden="true" size={14} />
+                </button>
                 <button type="button" className="director-agent-panel-icon-button" aria-label={layout.collapsed ? "展开面板" : "折叠面板"} title={layout.collapsed ? "展开" : "折叠"} onClick={() => updateLayout({ collapsed: !layout.collapsed })}>
                     {layout.collapsed ? <ChevronUp aria-hidden="true" size={14} /> : <ChevronDown aria-hidden="true" size={14} />}
                 </button>
                 <button type="button" className="director-agent-panel-icon-button" aria-label="切换停靠位置" title={docked ? "拖离边缘切换为自由浮动" : "拖到屏幕边缘吸附停靠"} onClick={() => updateLayout(docked ? { mode: "float", x: Math.max(60, window.innerWidth / 2 - FLOAT_WIDTH / 2), y: 90 } : { mode: "right" })}>
                     <Magnet aria-hidden="true" size={14} className={docked ? "director-agent-panel-dock-hint" : ""} />
                 </button>
-                {showBody ? (
+                {showBody && !showConfig ? (
                     <button type="button" className="director-agent-panel-icon-button" aria-label="清空对话" title="清空对话" onClick={clear}>
                         <Trash2 aria-hidden="true" size={14} />
                     </button>
@@ -204,75 +340,63 @@ export function DirectorAgentChatPanel() {
             </header>
 
             {showBody ? (
-                <div className="director-agent-panel-body">
-                    <div ref={scrollRef} className="director-agent-panel-messages">
-                        {messages.length === 0 ? (
-                            <div className="director-agent-panel-hint">
-                                让我来帮你摆场景和运镜。试试：
-                                <ul>
-                                    <li>放两个角色面对面对话，再摆一个箱子</li>
-                                    <li>给活动机位加一个环绕运镜</li>
-                                    <li>渲染一帧看看现在的构图</li>
-                                </ul>
-                                拖动标题栏可把面板放到任意位置，靠近屏幕左右边缘会自动吸附停靠。
-                            </div>
-                        ) : (
-                            messages.map((message) => {
-                                if (message.role === "tool") return <ToolChip key={message.id} name={message.toolName} summary={message.toolSummary} failed={message.text !== "ok"} />;
-                                if (message.role === "error") {
+                showConfig ? (
+                    <div className="director-agent-panel-body">
+                        <AgentModelConfig />
+                    </div>
+                ) : (
+                    <div className="director-agent-panel-body">
+                        <div ref={scrollRef} className="director-agent-panel-messages">
+                            {messages.length === 0 ? (
+                                <div className="director-agent-panel-hint">
+                                    让我来帮你摆场景和运镜。试试：
+                                    <ul>
+                                        <li>放两个角色面对面对话，再摆一个箱子</li>
+                                        <li>给活动机位加一个环绕运镜</li>
+                                        <li>渲染一帧看看现在的构图</li>
+                                    </ul>
+                                    拖动标题栏可把面板放到任意位置，靠近屏幕左右边缘会自动吸附停靠。
+                                </div>
+                            ) : (
+                                messages.map((message) => {
+                                    if (message.role === "tool") return <ToolChip key={message.id} name={message.toolName} summary={message.toolSummary} failed={message.text !== "ok"} />;
+                                    if (message.role === "error") {
+                                        return (
+                                            <div key={message.id} className="director-agent-panel-bubble is-error">
+                                                {message.text}
+                                            </div>
+                                        );
+                                    }
                                     return (
-                                        <div key={message.id} className="director-agent-panel-bubble is-error">
+                                        <div key={message.id} className={`director-agent-panel-bubble ${message.role === "user" ? "is-user" : "is-assistant"}`}>
                                             {message.text}
                                         </div>
                                     );
-                                }
-                                return (
-                                    <div key={message.id} className={`director-agent-panel-bubble ${message.role === "user" ? "is-user" : "is-assistant"}`}>
-                                        {message.text}
-                                    </div>
-                                );
-                            })
-                        )}
+                                })
+                            )}
+                        </div>
+                        {sending ? <div className="director-agent-panel-activity">{activity || "处理中…"}</div> : null}
+                        <div className="director-agent-panel-composer">
+                            <textarea
+                                className="director-agent-panel-input"
+                                placeholder="描述想要的场景或镜头…"
+                                rows={1}
+                                value={draft}
+                                onChange={(event) => setDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                                        event.preventDefault();
+                                        submit();
+                                    }
+                                }}
+                            />
+                            <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
+                                <Send aria-hidden="true" size={15} />
+                            </button>
+                        </div>
                     </div>
-                    {sending ? <div className="director-agent-panel-activity">{activity || "处理中…"}</div> : null}
-                    <div className="director-agent-panel-composer">
-                        <textarea
-                            className="director-agent-panel-input"
-                            placeholder="描述想要的场景或镜头…"
-                            rows={1}
-                            value={draft}
-                            onChange={(event) => setDraft(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                                    event.preventDefault();
-                                    submit();
-                                }
-                            }}
-                        />
-                        <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
-                            <Send aria-hidden="true" size={15} />
-                        </button>
-                    </div>
-                </div>
+                )
             ) : null}
         </aside>
-    );
-}
-
-/** 顶栏「AI 助手」开关按钮。 */
-export function DirectorAgentChatToggle() {
-    const open = useDirectorAgentChat((state) => state.open);
-    const toggle = useDirectorAgentChat((state) => state.toggle);
-    return (
-        <button
-            className={`top-bar-motion-button${open ? " is-active" : ""}`}
-            type="button"
-            aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
-            aria-pressed={open}
-            onClick={toggle}
-        >
-            <Bot aria-hidden="true" size={15} />
-            AI 助手
-        </button>
     );
 }
