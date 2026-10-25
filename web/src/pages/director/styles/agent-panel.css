@@ -16,19 +16,19 @@
 }
 
 .director-agent-panel.is-docked {
-  top: 10px;
-  bottom: 10px;
+  top: 0;
+  bottom: 0;
   width: 380px;
 }
 
 .director-agent-panel.is-docked[data-dock="left"] {
-  left: 10px;
+  left: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
 
 .director-agent-panel.is-docked[data-dock="right"] {
-  right: 10px;
+  right: 0;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
