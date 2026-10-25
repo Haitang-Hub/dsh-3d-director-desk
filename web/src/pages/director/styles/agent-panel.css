@@ -281,16 +281,17 @@
   min-width: 0;
 }
 
-.director-agent-model-trigger {
+/* 特异性高于 .director-desk-app button 的 font-size: inherit，否则字号设置不生效 */
+.director-agent-panel .director-agent-model-trigger {
   display: flex;
   align-items: center;
-  gap: 5px;
-  max-width: 260px;
+  gap: 4px;
+  max-width: 200px;
   border: none;
-  border-radius: 8px;
-  padding: 5px 7px;
+  border-radius: 7px;
+  padding: 3px 5px;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: rgb(var(--text-rgb));
   background: transparent;
   outline: none;
@@ -553,19 +554,39 @@
 .director-agent-appearance {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 12px);
   z-index: 5;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  width: 248px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  background: rgb(9 12 20 / 0.96);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.director-agent-appearance-block {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  width: 224px;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 13px;
-  padding: 12px 14px;
-  background: rgb(12 18 34 / 0.88);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.director-agent-appearance-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb));
+}
+
+.director-agent-appearance-block input[type="range"] {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: rgb(160 160 168);
+  cursor: pointer;
 }
 
 .director-agent-appearance-row {
@@ -573,23 +594,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-}
-
-.director-agent-appearance-row.is-column {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.director-agent-appearance-row > span {
-  font-size: 11.5px;
-  color: rgb(var(--text-muted-rgb));
-}
-
-.director-agent-appearance-row input[type="range"] {
-  width: 100%;
-  accent-color: rgb(77 143 248);
-  cursor: pointer;
 }
 
 .director-agent-appearance-row input[type="checkbox"] {

@@ -217,8 +217,29 @@ export function DirectorAgentChatPanel() {
     const [showAppearance, setShowAppearance] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const appearanceRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
     const panelRef = useRef<HTMLElement>(null);
+
+    // 外观设置：点到弹层与触发按钮以外的地方自动收回（Esc 同样）
+    useEffect(() => {
+        if (!showAppearance) return;
+        function onPointerDown(event: PointerEvent) {
+            const target = event.target as Node;
+            if (appearanceRef.current?.contains(target)) return;
+            if (target instanceof HTMLElement && target.closest('[aria-label="助手外观设置"]')) return;
+            setShowAppearance(false);
+        }
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") setShowAppearance(false);
+        }
+        document.addEventListener("pointerdown", onPointerDown);
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown);
+            document.removeEventListener("keydown", onKeyDown);
+        };
+    }, [showAppearance]);
 
     // 文本框随内容自适应高度（上限 140px，超出内部滚动）
     useEffect(() => {
@@ -388,9 +409,9 @@ export function DirectorAgentChatPanel() {
                             }}
                         />
                         {showAppearance ? (
-                            <div className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
-                                <label className="director-agent-appearance-row is-column">
-                                    <span>毛玻璃透明度</span>
+                            <div ref={appearanceRef} className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
+                                <div className="director-agent-appearance-block">
+                                    <div className="director-agent-appearance-label">毛玻璃透明度</div>
                                     <input
                                         type="range"
                                         min={30}
@@ -398,11 +419,11 @@ export function DirectorAgentChatPanel() {
                                         value={Math.round(layout.glassAlpha * 100)}
                                         onChange={(event) => updateLayout({ glassAlpha: Number(event.target.value) / 100 })}
                                     />
-                                </label>
-                                <label className="director-agent-appearance-row">
-                                    <span>紧凑模式</span>
+                                </div>
+                                <div className="director-agent-appearance-row">
+                                    <span className="director-agent-appearance-label">紧凑模式</span>
                                     <input type="checkbox" checked={layout.compact} onChange={(event) => updateLayout({ compact: event.target.checked })} />
-                                </label>
+                                </div>
                             </div>
                         ) : null}
                         <div className="director-agent-panel-composer-bar">
