@@ -15,9 +15,9 @@ if (-not (Test-Path "$webDir/node_modules")) {
 
 Write-Host "Starting services..." -ForegroundColor Cyan
 
-# 1. Local store (port 17372) - project data saved to disk (data/)
-Start-Process cmd -ArgumentList '/k', 'title Store 17372 && node index.js' -WorkingDirectory (Join-Path $root "local-store")
-Write-Host "  Store started" -ForegroundColor Green
+# 1. director-mcp (port 17372) - local project storage + director bridge
+Start-Process cmd -ArgumentList '/k', 'title director-mcp 17372 && node index.js' -WorkingDirectory (Join-Path $root "director-mcp")
+Write-Host "  director-mcp started" -ForegroundColor Green
 
 # 2. Web dev server (port 5080) - runs in current window
 Write-Host "Web: http://localhost:5080" -ForegroundColor Yellow

@@ -25,9 +25,9 @@ if not exist "%WEB_DIR%\node_modules" (
 echo Starting services...
 echo.
 
-:: 1. Local store (port 17372) - project data saved to disk (data/)
-start "Store 17372" cmd /k "pushd "%~dp0local-store" && node index.js"
-echo [OK] Store started
+:: 1. director-mcp (port 17372) - local project storage + director bridge
+start "director-mcp 17372" cmd /k "pushd "%~dp0director-mcp" && node index.js"
+echo [OK] director-mcp started
 echo.
 
 :: 2. Web dev server (blocking, current window)

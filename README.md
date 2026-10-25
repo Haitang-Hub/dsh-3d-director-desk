@@ -12,6 +12,8 @@
 │   └── src/pages/director/
 │       ├── index.tsx       导演台首页：新建/打开/删除导演台、快速上手
 │       └── editor-page.tsx 全屏编辑器（/director/editor，不带顶部导航）
+├── director-mcp/  常驻本地服务（端口 17372）：文件存储 + AI 桥 + stdio MCP 门面
+├── docs/          桥协议等文档
 ├── start.bat      Windows 一键启动
 └── start.ps1      PowerShell 一键启动
 ```
@@ -31,17 +33,36 @@ pro-components beta 的 peer 依赖声明冲突），然后启动 dev server。
 - `data/kv/`：导演台列表、场景工程等 localStorage 键值（写透镜像，防抖同步）
 - `data/assets/`：导入的模型/动画等二进制资产（磁盘优先，IndexedDB 回退）
 
-存储服务为 `local-store/`（零依赖 Node 服务，端口 17372，由 `start.bat` 自动启动）。
-服务不在线时自动回退浏览器存储；启动时自动把磁盘上缺失的键值**拉回** localStorage
-（跨浏览器/跨端口数据找回）；IndexedDB 中的旧资产在读取时**懒迁移**上盘。
-换浏览器或换机器时拷贝 `data/` 目录即可找回全部工程。
+存储由 `director-mcp/` 常驻服务承担（零依赖 Node，端口 17372，仅绑本机，由
+`start.bat` 自动启动）。服务不在线时自动回退浏览器存储；启动时自动把磁盘上缺失的
+键值**拉回** localStorage（跨浏览器/跨端口数据找回）；IndexedDB 中的旧资产在读取时
+**懒迁移**上盘。换浏览器或换机器时拷贝 `data/` 目录即可找回全部工程。
 
-## 可选：接入 Canvas Agent
+## AI 桥与 DeepSeek Harness 接入
 
-编辑器内置了一个无界面 Agent 桥（`use-director-agent-bridge`）：在 localStorage
-配置 `canvas-agent-url` 与 `canvas-agent-token` 后，可由 Agent 以 director 角色
-驱动 stage/camera/preview 工具自动摆场景、运镜、导出。未配置时该桥静默跳过，
-不影响纯手动编辑。
+`director-mcp` 把 17 个导演台能力（stage_* 摆场、camera_* 运镜、preview_* 出图/出片）
+以标准 MCP 工具暴露给 DeepSeek harness。编辑器内置的无界面 Agent 桥
+（`use-director-agent-bridge`）自动探测本机桥（`GET 127.0.0.1:17372/bootstrap`），
+也可以在 localStorage 显式配置 `director-bridge-url` / `director-bridge-token`
+（旧 `canvas-agent-*` 键仍兼容读取）；探测失败时静默跳过，**纯前端手动编辑不受影响**。
+导演台首页右上有「AI 桥在线/离线」徽标。
+
+harness 侧注册（前提：`start.bat` 已启动）：
+
+```json
+{ "mcpServers": {
+    "director-desk": {
+      "command": "node",
+      "args": ["F:/Code_Project/New_AIGC/3d-director-desk/director-mcp/index.js", "mcp"]
+    }
+}}
+```
+
+典型工作流：`stage_list_presets` 查预设 → `stage_place_character`/`stage_place_prop`
+摆场 → `camera_apply_preset`/`camera_set_keyframe` 设运镜 → `preview_render_frame`
+看构图 → `preview_export_animatic` 出片。渲染/导出类工具需要导演台页面在浏览器中
+打开（executor 离线时返回 `executor_offline`）；导出耗时可达数分钟，调用方需设置
+足够超时。协议细节见 `docs/bridge-protocol.md`。
 
 ## 开发
 
@@ -52,8 +73,16 @@ npm run typecheck  # 类型检查（存在少量上游遗留类型错误，为�
 npm run build      # 生产构建 → web/dist
 ```
 
-## 后续：DeepSeek Harness 插件化
+## 开发（director-mcp）
 
-本项目即为此目标而拆分：导演台功能完整收敛在 `web/src/pages/director` +
-共享层（`editor/`、`store/directorStore`、`schema/`、`motion/`、`io/`）中，
-与已删除的图像/视频/提示词等页面无耦合，便于后续封装为 DeepSeek harness 插件。
+```bash
+cd director-mcp
+npm run doctor   # 自检：桥端口 / executor 在线 / data 可写
+npm run mcp      # 单独起 stdio MCP 门面（harness 接入形态）
+node bridge-selftest.js  # 桥全回路自测
+```
+
+## 后续演进
+
+- 状态类工具的服务端直写（executor 离线时直接改写 `data/kv/` 场景工程）
+- 常驻无头浏览器作为渲染 worker（批量出片编排），见 `修改方案.md` 阶段三。
