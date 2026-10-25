@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { LogOut, Route } from "lucide-react";
+import { ArrowLeft, Route } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
@@ -213,7 +213,7 @@ export default function DirectorEditorPage() {
           <header className="top-bar">
             <div className="top-bar-left">
               <button className="top-bar-exit-button" type="button" title="退出导演台" aria-label="退出导演台" onClick={backToHome}>
-                <LogOut aria-hidden="true" size={15} />
+                <ArrowLeft aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField
                 desks={directorDesks}
