@@ -36,16 +36,6 @@ function saveLayout(layout: PanelLayout) {
     }
 }
 
-/** 面板收起时的右下角浮动入口。 */
-function AgentLauncher({ onClick }: { onClick: () => void }) {
-    return (
-        <button type="button" className="director-agent-launcher" onClick={onClick} aria-label="打开 AI 助手">
-            <Bot aria-hidden="true" size={16} />
-            AI 助手
-        </button>
-    );
-}
-
 /** 渲染一行工具执行记录（默认折叠为单行 chip，点击展开）。 */
 function ToolChip({ name, summary, failed }: { name?: string; summary?: string; failed?: boolean }) {
     const [expanded, setExpanded] = useState(false);
@@ -220,7 +210,7 @@ export function DirectorAgentChatPanel() {
         });
     }, [open]);
 
-    if (!open) return <AgentLauncher onClick={() => setOpen(true)} />;
+    if (!open) return null;
     const model = describeAgentModel();
 
     function updateLayout(patch: Partial<PanelLayout>) {
@@ -398,5 +388,23 @@ export function DirectorAgentChatPanel() {
                 )
             ) : null}
         </aside>
+    );
+}
+
+/** 顶栏「AI 助手」开关按钮。 */
+export function DirectorAgentChatToggle() {
+    const open = useDirectorAgentChat((state) => state.open);
+    const toggle = useDirectorAgentChat((state) => state.toggle);
+    return (
+        <button
+            className={`top-bar-motion-button${open ? " is-active" : ""}`}
+            type="button"
+            aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
+            aria-pressed={open}
+            onClick={toggle}
+        >
+            <Bot aria-hidden="true" size={15} />
+            AI 助手
+        </button>
     );
 }

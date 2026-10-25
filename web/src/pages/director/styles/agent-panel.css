@@ -287,32 +287,6 @@
   opacity: 0.4;
 }
 
-/* 面板收起时的右下角浮动入口 */
-.director-agent-launcher {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid rgb(var(--accent-rgb) / 0.55);
-  border-radius: 999px;
-  padding: 10px 16px;
-  color: #fff;
-  background: rgb(var(--accent-rgb) / 0.9);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.16s ease, transform 0.16s ease;
-}
-
-.director-agent-launcher:hover {
-  background: rgb(var(--accent-rgb) / 1);
-  transform: translateY(-1px);
-}
-
 /* 模型配置视图 */
 .director-agent-config {
   display: flex;
