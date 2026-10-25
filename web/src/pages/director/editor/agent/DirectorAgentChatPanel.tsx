@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, ChevronDown, ChevronRight, ChevronUp, Magnet, Send, Trash2, X } from "lucide-react";
+import { ArrowUp, Bot, ChevronDown, ChevronRight, ChevronUp, Eraser, Magnet, SlidersHorizontal, X } from "lucide-react";
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
@@ -123,7 +123,7 @@ function AgentModelRow() {
         return text.length ? text : channel.models;
     };
     const options = channels.flatMap((channel) =>
-        textModelsOf(channel).map((model) => ({ value: encodeChannelModel(channel.id, model.name), label: model.name })),
+        textModelsOf(channel).map((model) => ({ value: encodeChannelModel(channel.id, model.name), label: channel.name ? `${model.name} (${channel.name})` : model.name })),
     );
     const hasOptions = options.length > 0;
 
@@ -294,11 +294,6 @@ export function DirectorAgentChatPanel() {
                 <button type="button" className="director-agent-panel-icon-button" aria-label="切换停靠位置" title={docked ? "拖离边缘切换为自由浮动" : "拖到屏幕边缘吸附停靠"} onClick={() => updateLayout(docked ? { mode: "float", x: Math.max(60, window.innerWidth / 2 - FLOAT_WIDTH / 2), y: 90 } : { mode: "right" })}>
                     <Magnet aria-hidden="true" size={14} className={docked ? "director-agent-panel-dock-hint" : ""} />
                 </button>
-                {showBody ? (
-                    <button type="button" className="director-agent-panel-icon-button" aria-label="清空对话" title="清空对话" onClick={clear}>
-                        <Trash2 aria-hidden="true" size={14} />
-                    </button>
-                ) : null}
                 <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 AI 助手" title="关闭" onClick={() => setOpen(false)}>
                     <X aria-hidden="true" size={15} />
                 </button>
@@ -324,7 +319,7 @@ export function DirectorAgentChatPanel() {
                     <div className="director-agent-panel-composer">
                         <textarea
                             className="director-agent-panel-input"
-                            placeholder="描述想要的场景或镜头…"
+                            placeholder="让 AI 助手帮你操作导演台…"
                             rows={2}
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
@@ -337,9 +332,23 @@ export function DirectorAgentChatPanel() {
                         />
                         <div className="director-agent-panel-composer-bar">
                             <AgentModelRow />
-                            <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
-                                <Send aria-hidden="true" size={14} />
-                            </button>
+                            <div className="director-agent-panel-composer-tools">
+                                <button
+                                    type="button"
+                                    className="director-agent-panel-icon-button"
+                                    aria-label="打开模型配置"
+                                    title="模型配置"
+                                    onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
+                                >
+                                    <SlidersHorizontal aria-hidden="true" size={14} />
+                                </button>
+                                <button type="button" className="director-agent-panel-icon-button" aria-label="清空对话" title="清空对话" onClick={clear}>
+                                    <Eraser aria-hidden="true" size={14} />
+                                </button>
+                                <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
+                                    <ArrowUp aria-hidden="true" size={15} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -258,19 +258,30 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 6px 6px 8px;
+  padding: 0 8px 8px 6px;
+}
+
+.director-agent-panel-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.director-agent-panel-composer-tools .director-agent-panel-icon-button {
+  width: 28px;
+  height: 28px;
 }
 
 /* 输入框内的模型选择：无边框透明下拉 */
 .director-agent-model-select {
   min-width: 0;
-  max-width: 220px;
+  max-width: 250px;
   overflow: hidden;
   border: none;
   border-radius: 8px;
-  padding: 4px 6px;
+  padding: 5px 6px;
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: rgb(var(--text-muted-rgb));
   background: transparent;
   outline: none;
@@ -292,12 +303,12 @@
 
 .director-agent-panel-input {
   flex: 1;
-  min-height: 44px;
-  max-height: 120px;
+  min-height: 52px;
+  max-height: 140px;
   resize: none;
   border: none;
   border-radius: 11px;
-  padding: 10px 12px 4px;
+  padding: 12px 14px 2px;
   font-family: inherit;
   font-size: 12.5px;
   line-height: 1.5;
@@ -313,15 +324,22 @@
 .director-agent-panel-send {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  border: none;
-  border-radius: 9px;
-  color: #fff;
-  background: rgb(77 143 248 / 0.9);
+  margin-left: 4px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 50%;
+  color: rgb(var(--text-rgb));
+  background: rgb(255 255 255 / 0.12);
   cursor: pointer;
   transition: background-color 0.16s ease, opacity 0.16s ease;
+}
+
+.director-agent-panel-send:hover:not(:disabled) {
+  background: rgb(77 143 248 / 0.85);
+  border-color: rgb(96 148 255 / 0.5);
+  color: #fff;
 }
 
 .director-agent-panel-send:hover {
