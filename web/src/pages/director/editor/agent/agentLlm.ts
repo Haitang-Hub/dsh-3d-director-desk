@@ -64,10 +64,26 @@ export function resolveAgentRequestConfig(): AgentRequestConfig {
     return { baseUrl: channel.baseUrl, apiKey: channel.apiKey, apiFormat: channel.apiFormat, model };
 }
 
+/** 把网络层失败翻译成可操作的提示（Failed to fetch 多为断网或本地代理没开）。 */
+function describeFetchError(error: unknown) {
+    if (error instanceof TypeError) {
+        const { proxyEnabled, proxyUrl } = useConfigStore.getState().config;
+        if (proxyEnabled && proxyUrl.trim()) {
+            return new Error(`网络请求失败：请求需要经过本地代理 ${proxyUrl.trim()}，请确认代理软件正在运行，或在「模型配置」的代理设置里暂时关闭本地代理。`);
+        }
+        return new Error("网络请求失败：请检查网络连接后重试。");
+    }
+    return error;
+}
+
 /** 调用一次模型；返回 assistant 文本与工具调用（两种协议统一为同一结果形态）。 */
 export async function callAgentLlm(messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
     const requestConfig = resolveAgentRequestConfig();
-    return requestConfig.apiFormat === "anthropic" ? callAnthropicLlm(requestConfig, messages, tools, signal) : callOpenAiLlm(requestConfig, messages, tools, signal);
+    try {
+        return requestConfig.apiFormat === "anthropic" ? await callAnthropicLlm(requestConfig, messages, tools, signal) : await callOpenAiLlm(requestConfig, messages, tools, signal);
+    } catch (error) {
+        throw describeFetchError(error);
+    }
 }
 
 async function callOpenAiLlm(requestConfig: AgentRequestConfig, messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal) {
