@@ -174,10 +174,10 @@ export default function DirectorEditorPage() {
   }
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden">
+    <div className="h-dvh w-full overflow-hidden">
       <DirectorAgentBridge />
-      <DirectorAgentChatPanel />
       <div className="director-desk-app" data-theme="dark">
+        <DirectorAgentChatPanel />
         <div className="app-shell">
           <header className="top-bar">
             <div className="top-bar-left">
