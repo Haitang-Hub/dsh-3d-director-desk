@@ -306,6 +306,14 @@ export default function DirectorPage() {
                 </button>
                 <div className="director-home-card-actions">
                   <button
+                    className="director-home-card-delete"
+                    type="button"
+                    aria-label={`删除${desk.name}`}
+                    onClick={() => handleDeleteDesk(desk)}
+                  >
+                    <Trash2 aria-hidden="true" size={15} strokeWidth={1.9} />
+                  </button>
+                  <button
                     className="director-home-card-export"
                     type="button"
                     aria-label={`导出${desk.name}`}
@@ -313,14 +321,6 @@ export default function DirectorPage() {
                     onClick={() => handleExportDesk(desk)}
                   >
                     <Download aria-hidden="true" size={15} strokeWidth={1.9} />
-                  </button>
-                  <button
-                    className="director-home-card-delete"
-                    type="button"
-                    aria-label={`删除${desk.name}`}
-                    onClick={() => handleDeleteDesk(desk)}
-                  >
-                    <Trash2 aria-hidden="true" size={15} strokeWidth={1.9} />
                   </button>
                 </div>
               </article>
