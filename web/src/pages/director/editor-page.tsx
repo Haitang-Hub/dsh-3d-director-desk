@@ -1,7 +1,9 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Route } from "lucide-react";
+import { ArrowLeft, Route, Settings2 } from "lucide-react";
+import { AppConfigModal } from "@/components/layout/app-config-modal";
+import { useConfigStore } from "@/stores/use-config-store";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
@@ -209,6 +211,7 @@ export default function DirectorEditorPage() {
       <DirectorAgentBridge />
       <div className="director-desk-app" data-theme="dark">
         <DirectorAgentChatPanel />
+      <AppConfigModal />
         <div className="app-shell">
           <header className="top-bar">
             <div className="top-bar-left">
@@ -261,7 +264,15 @@ export default function DirectorEditorPage() {
             </div>
             <div className="top-bar-right">
               <DirectorAgentChatToggle />
-              {/* 模型配置入口移入 AI 助手面板（标题栏齿轮） */}
+              <button
+                className="top-bar-motion-button"
+                type="button"
+                aria-label="打开模型配置"
+                title="模型配置"
+                onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
+              >
+                <Settings2 aria-hidden="true" size={15} />
+              </button>
             </div>
           </header>
           <DirectorDeskShell>
