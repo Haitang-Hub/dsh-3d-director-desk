@@ -65,54 +65,91 @@ type DirectorToolInput = {
     fileName?: string;
     includeData?: boolean;
     returnToCanvas?: boolean;
+    keepCameras?: boolean;
 };
 
 const DIRECTOR_AGENT_PROTOCOL_VERSION = 7;
 /** 桥实现版本：服务端在多个导演台页面同时连接时优先路由到最新版本。 */
 const DIRECTOR_BRIDGE_VERSION = 6;
+/** 本项目自有桥（director-mcp，端口 17372）的默认地址；自动发现失败即保持纯前端可用。 */
+export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17372";
+
+/** 解析桥连接：显式配置（新键名，兼容读旧 canvas-agent 键）优先，否则探测本机 director-mcp。 */
+async function resolveDirectorBridge(): Promise<{ endpoint: string; token: string } | null> {
+    const storedEndpoint = (localStorage.getItem("director-bridge-url") || localStorage.getItem("canvas-agent-url") || "").replace(/\/$/, "");
+    const storedToken = localStorage.getItem("director-bridge-token") || localStorage.getItem("canvas-agent-token") || "";
+    if (storedEndpoint && storedToken) return { endpoint: storedEndpoint, token: storedToken };
+    try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 1500);
+        const res = await fetch(`${DIRECTOR_BRIDGE_DEFAULT_ENDPOINT}/bootstrap`, { signal: controller.signal });
+        window.clearTimeout(timer);
+        if (res.ok) return { endpoint: DIRECTOR_BRIDGE_DEFAULT_ENDPOINT, token: storedToken };
+    } catch {
+        // 桥未启动：保持纯前端可用，静默跳过
+    }
+    return null;
+}
+
+/** 探测桥在线状态（首页"AI 桥状态"徽标用）。 */
+export async function probeDirectorBridge(): Promise<{ online: boolean; protocolVersion: number | null }> {
+    try {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 1500);
+        const res = await fetch(`${DIRECTOR_BRIDGE_DEFAULT_ENDPOINT}/bootstrap`, { signal: controller.signal });
+        window.clearTimeout(timer);
+        if (!res.ok) return { online: false, protocolVersion: null };
+        const body = (await res.json()) as { protocolVersion?: number };
+        return { online: true, protocolVersion: Number(body.protocolVersion) || null };
+    } catch {
+        return { online: false, protocolVersion: null };
+    }
+}
 
 /**
- * 导演台页面与本机 Canvas Agent 的无界面桥：以 director 角色接入 SSE，
+ * 导演台页面与本机 director-mcp 桥的无界面桥：以 director 角色接入 SSE，
  * 接收 stage / camera / preview 工具调用，直接驱动导演台 store 与导出器执行。
  */
 export function DirectorAgentBridge() {
     const clientIdRef = useRef(`director-${Math.random().toString(36).slice(2, 10)}`);
 
     useEffect(() => {
-        const endpoint = (localStorage.getItem("canvas-agent-url") || "").replace(/\/$/, "");
-        const token = localStorage.getItem("canvas-agent-token") || "";
-        if (!endpoint || !token) return;
-
         const clientId = clientIdRef.current;
         let disposed = false;
-        const source = new EventSource(`${endpoint}/events?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}&role=director&dv=${DIRECTOR_BRIDGE_VERSION}&desk=${encodeURIComponent(new URLSearchParams(window.location.search).get("instanceId") || "")}`);
+        let source: EventSource | null = null;
 
-        // 编辑器完全加载后上报就绪；未就绪的窗口不参与导演台工具路由。
-        const reportReady = () => {
-            const deskId = new URLSearchParams(window.location.search).get("instanceId") || "";
-            void fetch(endpoint + "/director/ready?token=" + encodeURIComponent(token), {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ clientId, deskId }),
-            }).catch(() => undefined);
-        };
-        reportReady();
-        source.addEventListener("hello", (event) => {
-            const hello = parseData(event);
-            if (!hello || disposed) return;
-            if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) source.close();
-        });
-        source.addEventListener("tool_call", (event) => {
-            const payload = parseData(event) as { requestId?: string; name?: string; input?: DirectorToolInput } | null;
-            if (!payload?.requestId || !payload.name) return;
-            void runDirectorTool(payload.name, payload.input || {})
-                .then((result) => postResult(endpoint, token, clientId, payload.requestId!, { result }))
-                .catch((error) => postResult(endpoint, token, clientId, payload.requestId!, { error: error instanceof Error ? error.message : String(error) }));
+        void resolveDirectorBridge().then((bridge) => {
+            if (!bridge || disposed) return;
+            const { endpoint, token } = bridge;
+            source = new EventSource(`${endpoint}/events?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}&role=director&dv=${DIRECTOR_BRIDGE_VERSION}&desk=${encodeURIComponent(new URLSearchParams(window.location.search).get("instanceId") || "")}`);
+
+            // 编辑器完全加载后上报就绪；未就绪的窗口不参与导演台工具路由。
+            const reportReady = () => {
+                const deskId = new URLSearchParams(window.location.search).get("instanceId") || "";
+                void fetch(`${endpoint}/director/ready?token=${encodeURIComponent(token)}`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ clientId, deskId }),
+                }).catch(() => undefined);
+            };
+            reportReady();
+            source.addEventListener("hello", (event) => {
+                const hello = parseData(event);
+                if (!hello || disposed) return;
+                if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) source?.close();
+            });
+            source.addEventListener("tool_call", (event) => {
+                const payload = parseData(event) as { requestId?: string; name?: string; input?: DirectorToolInput } | null;
+                if (!payload?.requestId || !payload.name) return;
+                void runDirectorTool(payload.name, payload.input || {})
+                    .then((result) => postResult(endpoint, token, clientId, payload.requestId!, { result }))
+                    .catch((error) => postResult(endpoint, token, clientId, payload.requestId!, { error: error instanceof Error ? error.message : String(error) }));
+            });
         });
 
         return () => {
             disposed = true;
-            source.close();
+            source?.close();
         };
     }, []);
 
@@ -386,7 +423,8 @@ async function runDirectorTool(name: string, input: DirectorToolInput) {
                 ...(input.includeData ? { dataUrl: result.dataUrl } : {}),
                 returnedToCanvas: false,
             };
-            if (input.returnToCanvas === false) return summary;
+            // 独立使用（无来源画布）时默认不写回画布，直接返回产物摘要；显式 returnToCanvas=true 才在缺画布时报错。
+            if (input.returnToCanvas !== true && !(await readImportTarget())) return summary;
             const canvasNodeId = await appendFrameToCanvas(result.dataUrl, input.fileName || result.fileName);
             return canvasNodeId ? { ...summary, returnedToCanvas: true, canvasNodeId } : summary;
         }
@@ -401,7 +439,7 @@ async function runDirectorTool(name: string, input: DirectorToolInput) {
                 quality: input.quality || "720p",
             });
             const summary = { fileName: result.fileName, width: result.width, height: result.height, durationSeconds: result.durationSeconds, mimeType: result.mimeType, returnedToCanvas: false };
-            if (input.returnToCanvas === false) return summary;
+            if (input.returnToCanvas !== true && !(await readImportTarget())) return summary;
             const canvasNodeId = await appendAnimaticToCanvas(result.blob);
             return canvasNodeId ? { ...summary, returnedToCanvas: true, canvasNodeId } : summary;
         }
@@ -490,11 +528,14 @@ async function appendFrameToCanvas(dataUrl: string, fileName: string) {
 }
 
 async function postResult(endpoint: string, token: string, clientId: string, requestId: string, body: { result?: unknown; error?: string }) {
-    await fetch(`${endpoint}/canvas/result?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`, {
+    const init: RequestInit = {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ requestId, ...body }),
-    });
+    };
+    // 本项目 director-mcp 桥用 /director/result；兼容旧 canvas-agent 配置回落 /canvas/result
+    let res = await fetch(`${endpoint}/director/result?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`, init).catch(() => null);
+    if (res && res.status === 404) res = await fetch(`${endpoint}/canvas/result?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`, init).catch(() => null);
 }
 
 function parseData(event: MessageEvent) {

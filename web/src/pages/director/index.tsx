@@ -15,6 +15,7 @@ import {
   type DirectorDeskRecord,
 } from "./editor/workspaces/directorDeskRegistry";
 import { getPerformanceBenchmarkMode } from "./editor/performance/performanceBenchmark";
+import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
 const HOME_QUICK_START_STEPS = [
   ["选择导演台", "打开已有导演台，或点击“新建导演台”创建一个空场景。"],
@@ -121,6 +122,24 @@ export default function DirectorPage() {
   const navigate = useNavigate();
   const theme = useThemeStore((state) => state.theme);
   const [records, setRecords] = useState(() => ensureDirectorDeskRecords());
+  // AI 桥（director-mcp，17372）在线状态：null = 探测中
+  const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    probeDirectorBridge().then((status) => {
+      if (alive) setBridgeOnline(status.online);
+    });
+    const timer = window.setInterval(() => {
+      probeDirectorBridge().then((status) => {
+        if (alive) setBridgeOnline(status.online);
+      });
+    }, 10_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   // 兼容旧链接：/director?instanceId=… 与性能基准参数一律进入全屏编辑器页
   const urlInstanceId = new URLSearchParams(window.location.search).get("instanceId")?.trim() || null;
@@ -170,6 +189,24 @@ export default function DirectorPage() {
             <p>
               每个导演台独立保存，重启后先回到这里选择，不会再直接打开上一次的无名工程。
             </p>
+            <span
+              title={bridgeOnline ? "AI 桥（director-mcp）在线，DeepSeek 可以驱动导演台" : "AI 桥未启动：纯前端功能不受影响；要接 AI 编排请运行 start.bat"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 12,
+                fontSize: 13,
+                padding: "3px 10px",
+                borderRadius: 999,
+                border: `1px solid ${bridgeOnline ? "#16a34a55" : "#9ca3af44"}`,
+                color: bridgeOnline ? "#16a34a" : "#9ca3af",
+                userSelect: "none",
+              }}
+            >
+              <Sparkles aria-hidden="true" size={13} />
+              {bridgeOnline === null ? "AI 桥检测中…" : bridgeOnline ? "AI 桥在线" : "AI 桥离线"}
+            </span>
           </div>
           <div className="director-home-hero-actions">
             <button className="director-home-primary-button" type="button" onClick={handleCreateDesk}>
