@@ -491,13 +491,8 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
-                // Auto-enable local proxy when injected by start script
-                const devConfig = (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__INFINITE_CANVAS_CONFIG__) || {};
-                if ((devConfig as Record<string, unknown>).autoProxyEnabled) {
-                    config.proxyEnabled = true;
-                    const autoProxyUrl = (devConfig as Record<string, unknown>).autoProxyUrl;
-                    if (autoProxyUrl) config.proxyUrl = autoProxyUrl as string;
-                }
+                // 本项目不再使用本地转发代理：忽略历史遗留的 proxyEnabled，一律直连
+                config.proxyEnabled = false;
                 const channels = migrateModelScripts(normalizeChannels(config));
                 const models = modelOptionsFromChannels(channels);
                 return {
@@ -745,7 +740,8 @@ export function buildApiUrl(baseUrl: string, path: string) {
     const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     const apiBaseUrl = lowerBaseUrl.endsWith("/v1") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
-    return withLocalProxy(`${apiBaseUrl}${path}`);
+    // 本项目不再使用本地转发代理，模型请求一律直连
+    return `${apiBaseUrl}${path}`;
 }
 
 export function normalizeLocalProxyUrl(value: string) {

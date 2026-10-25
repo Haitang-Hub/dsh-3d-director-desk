@@ -64,14 +64,10 @@ export function resolveAgentRequestConfig(): AgentRequestConfig {
     return { baseUrl: channel.baseUrl, apiKey: channel.apiKey, apiFormat: channel.apiFormat, model };
 }
 
-/** 把网络层失败翻译成可操作的提示（Failed to fetch 多为断网或本地代理没开）。 */
+/** 把网络层失败翻译成可操作的提示（Failed to fetch 多为断网或渠道地址不可达）。 */
 function describeFetchError(error: unknown) {
     if (error instanceof TypeError) {
-        const { proxyEnabled, proxyUrl } = useConfigStore.getState().config;
-        if (proxyEnabled && proxyUrl.trim()) {
-            return new Error(`网络请求失败：请求需要经过本地代理 ${proxyUrl.trim()}，请确认代理软件正在运行，或在「模型配置」的代理设置里暂时关闭本地代理。`);
-        }
-        return new Error("网络请求失败：请检查网络连接后重试。");
+        return new Error("网络请求失败：请检查网络连接，或确认渠道接口地址可达后重试。");
     }
     return error;
 }
