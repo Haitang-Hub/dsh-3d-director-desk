@@ -408,27 +408,27 @@ export function DirectorAgentChatPanel() {
                                 }
                             }}
                         />
-                        {showAppearance ? (
-                            <div ref={appearanceRef} className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
-                                <div className="director-agent-appearance-block">
-                                    <div className="director-agent-appearance-label">毛玻璃透明度</div>
-                                    <input
-                                        type="range"
-                                        min={30}
-                                        max={92}
-                                        value={Math.round(layout.glassAlpha * 100)}
-                                        onChange={(event) => updateLayout({ glassAlpha: Number(event.target.value) / 100 })}
-                                    />
-                                </div>
-                                <div className="director-agent-appearance-row">
-                                    <span className="director-agent-appearance-label">紧凑模式</span>
-                                    <input type="checkbox" checked={layout.compact} onChange={(event) => updateLayout({ compact: event.target.checked })} />
-                                </div>
-                            </div>
-                        ) : null}
                         <div className="director-agent-panel-composer-bar">
                             <AgentModelRow />
                             <div className="director-agent-panel-composer-tools">
+                                {showAppearance ? (
+                                    <div ref={appearanceRef} className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
+                                        <div className="director-agent-appearance-block">
+                                            <div className="director-agent-appearance-label">毛玻璃透明度</div>
+                                            <input
+                                                type="range"
+                                                min={30}
+                                                max={92}
+                                                value={Math.round(layout.glassAlpha * 100)}
+                                                onChange={(event) => updateLayout({ glassAlpha: Number(event.target.value) / 100 })}
+                                            />
+                                        </div>
+                                        <div className="director-agent-appearance-row">
+                                            <span className="director-agent-appearance-label">紧凑模式</span>
+                                            <input type="checkbox" checked={layout.compact} onChange={(event) => updateLayout({ compact: event.target.checked })} />
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <button
                                     type="button"
                                     className={`director-agent-panel-icon-button${showAppearance ? " is-active" : ""}`}

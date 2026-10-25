@@ -265,9 +265,29 @@
 }
 
 .director-agent-panel-composer-tools {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+/* 弹层锚定在工具按钮组上方，右缘与发送键对齐 */
+.director-agent-appearance {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 248px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  background: rgb(9 12 20 / 0.96);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
 }
 
 .director-agent-panel-composer-tools .director-agent-panel-icon-button {
@@ -401,6 +421,11 @@
 
 .director-agent-panel-input::placeholder {
   color: rgb(var(--text-muted-rgb));
+}
+
+/* 覆盖 foundation.css 的 .director-desk-app textarea:focus-visible 蓝色 outline（特异性更高） */
+.director-agent-panel .director-agent-panel-input:focus-visible {
+  outline: none;
 }
 
 .director-agent-panel-send {
@@ -550,25 +575,7 @@
   opacity: 0.35;
 }
 
-/* 助手外观设置弹层 */
-.director-agent-appearance {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 12px);
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 248px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 12px;
-  padding: 16px 18px 18px;
-  background: rgb(9 12 20 / 0.96);
-  box-shadow: 0 18px 44px rgb(0 0 0 / 0.6);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-}
-
+/* 助手外观设置弹层的其余样式见 composer-tools 附近的规则块 */
 .director-agent-appearance-block {
   display: flex;
   flex-direction: column;
