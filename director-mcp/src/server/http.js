@@ -1,28 +1,38 @@
-#!/usr/bin/env node
 /**
- * 3D 导演台本地文件存储服务（零依赖，端口 17372）。
- * 把导演台工程（localStorage 键值）与导入的模型资产（二进制）落到项目 data/ 目录，
- * 摆脱浏览器存储的 origin 隔离与清库风险。
+ * director-mcp 常驻 HTTP 服务（零依赖，端口 17372，仅绑 127.0.0.1）。
+ * 一个进程三个角色：
+ *   1. 本地文件存储（/kv、/assets，工程数据落盘 data/）
+ *   2. 导演台桥（/events SSE、/director/*，工具调用分发给浏览器 executor）
+ *   3. MCP 门面的后端（mcp.js 的 stdio 进程经 /director/tool 转发到桥）
  *
  * 端点：
- *   GET    /health
- *   GET    /kv                 -> { keys: [...] }
- *   GET    /kv/:key            -> 文本内容（404 = 无）
- *   PUT    /kv/:key            <- 文本内容
+ *   GET    /health              -> { ok, dataDir }
+ *   GET    /bootstrap           -> { ok, name, version, protocolVersion }（web 端自动发现桥）
+ *   GET    /kv                  -> { keys: [...] }
+ *   GET    /kv/:key             -> 文本内容（404 = 无）
+ *   PUT    /kv/:key             <- 文本内容
  *   DELETE /kv/:key
- *   POST   /assets/:key        <- 二进制体（X-File-Name 可选、Content-Type 为 mime）
- *   GET    /assets/:key        -> 二进制内容
+ *   POST   /assets/:key         <- 二进制体（X-File-Name 可选、Content-Type 为 mime）
+ *   GET    /assets/:key         -> 二进制内容
  *   DELETE /assets/:key
+ *   GET    /events              -> SSE（query: clientId, dv, desk；role=director 注册 executor）
+ *   POST   /director/ready      <- { clientId, deskId }
+ *   POST   /director/result     <- { requestId, result | error }（query: clientId）
+ *   GET    /director/status     -> executor 在线概况
+ *   POST   /director/tool       <- { name, input, desk? } -> { ok, result } 或结构化错误
  */
 
 import fs from "node:fs";
 import http from "node:http";
-import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+
+import { DirectorBridge, ToolError } from "./bridge.js";
+import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
 const PORT = Number(process.env.STORE_PORT || 17372);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
-const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "data"));
+const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "data"));
 
 const encodeKey = (key) => encodeURIComponent(key);
 
@@ -56,6 +66,14 @@ function sendJson(res, status, payload) {
     send(res, status, JSON.stringify(payload), { "content-type": "application/json; charset=utf-8" });
 }
 
+/** ToolError -> 结构化响应；其余按 500。 */
+function sendToolError(res, error) {
+    if (error instanceof ToolError) return sendJson(res, 200, { ok: false, error: error.message, code: error.code, ...(error.hint ? { hint: error.hint } : {}) });
+    return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+}
+
+const bridge = new DirectorBridge(DATA_DIR);
+
 const server = http.createServer(async (req, res) => {
     // 本机服务，全部放开 CORS，供不同端口的 dev server 页面访问
     res.setHeader("access-control-allow-origin", "*");
@@ -63,9 +81,15 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("access-control-allow-headers", "content-type, x-file-name");
     if (req.method === "OPTIONS") return sendJson(res, 204, {});
 
+    let url;
+    try {
+        url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+    } catch {
+        return sendJson(res, 400, { ok: false, error: "bad url" });
+    }
     let pathname = "";
     try {
-        pathname = decodeURIComponent(new URL(req.url, `http://${req.headers.host || "localhost"}`).pathname);
+        pathname = decodeURIComponent(url.pathname);
     } catch {
         return sendJson(res, 400, { ok: false, error: "bad url" });
     }
@@ -75,6 +99,35 @@ const server = http.createServer(async (req, res) => {
 
     try {
         if (group === "health") return sendJson(res, 200, { ok: true, dataDir: DATA_DIR });
+
+        if (group === "bootstrap") {
+            return sendJson(res, 200, { ok: true, name: SERVER_NAME, version: SERVER_VERSION, protocolVersion: DIRECTOR_PROTOCOL_VERSION });
+        }
+
+        if (group === "events" && req.method === "GET") return bridge.openEvents(url, res);
+
+        if (group === "director") {
+            if (key === "ready" && req.method === "POST") {
+                const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+                const ok = bridge.markReady(String(body.clientId || ""), String(body.deskId || ""));
+                return sendJson(res, ok ? 200 : 404, { ok });
+            }
+            if (key === "result" && req.method === "POST") {
+                const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+                const ok = bridge.resolveResult(String(url.searchParams.get("clientId") || ""), body);
+                return sendJson(res, ok ? 200 : 409, { ok });
+            }
+            if (key === "status" && req.method === "GET") return sendJson(res, 200, { ok: true, ...bridge.status() });
+            if (key === "tool" && req.method === "POST") {
+                const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+                try {
+                    const result = await bridge.callTool(String(body.name || ""), body.input || {}, String(body.desk || ""));
+                    return sendJson(res, 200, { ok: true, result });
+                } catch (error) {
+                    return sendToolError(res, error);
+                }
+            }
+        }
 
         if (group === "kv" && key) {
             const file = join(subDir("kv"), `${encodeKey(key)}.txt`);
@@ -148,6 +201,10 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-server.listen(PORT, HOST, () => {
-    console.log(`[local-store] listening on http://${HOST}:${PORT}, data dir: ${DATA_DIR}`);
-});
+export function startHttpServer() {
+    server.listen(PORT, HOST, () => {
+        console.log(`[director-mcp] listening on http://${HOST}:${PORT}, data dir: ${DATA_DIR}`);
+        console.log(`[director-mcp] bridge protocol v${DIRECTOR_PROTOCOL_VERSION}; MCP stdio: node index.js mcp; self-check: node index.js doctor`);
+    });
+    return server;
+}

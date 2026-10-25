@@ -1,0 +1,15 @@
+{
+    "name": "director-mcp",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "3D 导演台常驻本地服务：本地文件存储（/kv、/assets）+ 导演台桥（SSE 工具分发）+ stdio MCP 门面（director-desk）。",
+    "scripts": {
+        "start": "node index.js",
+        "mcp": "node index.js mcp",
+        "doctor": "node index.js doctor"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}
