@@ -5,10 +5,14 @@
   z-index: 80;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid rgb(140 175 255 / 0.22);
+  overflow: visible;
+  border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 16px;
-  background: linear-gradient(165deg, rgb(20 30 56 / 0.62), rgb(8 12 24 / 0.68));
+  background: linear-gradient(
+    165deg,
+    rgb(20 30 56 / var(--director-agent-glass-alpha, 0.68)),
+    rgb(8 12 24 / calc(var(--director-agent-glass-alpha, 0.68) + 0.06))
+  );
   color: rgb(var(--text-rgb));
   box-shadow:
     0 24px 68px rgb(0 0 0 / 0.5),
@@ -68,6 +72,7 @@
   padding: 0 8px 0 12px;
   border-bottom: 1px solid rgb(255 255 255 / 0.07);
   background: linear-gradient(90deg, rgb(77 143 248 / 0.1), transparent 60%);
+  border-radius: 15px 15px 0 0;
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -234,23 +239,21 @@
 
 /* 输入容器：一体化玻璃圆角框，模型选择与发送键嵌在内部 */
 .director-agent-panel-composer {
+  position: relative;
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
   gap: 2px;
   margin: 0 10px 10px;
-  border: 1px solid rgb(140 175 255 / 0.24);
+  border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 13px;
-  background: rgb(10 16 32 / 0.55);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  transition: border-color 0.16s ease;
 }
 
 .director-agent-panel-composer:focus-within {
-  border-color: rgb(96 148 255 / 0.65);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 0 0 3px rgb(77 143 248 / 0.14);
+  border-color: rgb(255 255 255 / 0.22);
 }
 
 .director-agent-panel-composer-bar {
@@ -302,7 +305,7 @@
 }
 
 .director-agent-panel-input {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 52px;
   max-height: 140px;
   resize: none;
@@ -315,6 +318,7 @@
   color: rgb(var(--text-rgb));
   background: transparent;
   outline: none;
+  overflow-y: auto;
 }
 
 .director-agent-panel-input::placeholder {
@@ -466,4 +470,112 @@
 .director-agent-panel-icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.35;
+}
+
+/* 助手外观设置弹层 */
+.director-agent-appearance {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 224px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 13px;
+  padding: 12px 14px;
+  background: rgb(12 18 34 / 0.88);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.director-agent-appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.director-agent-appearance-row.is-column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.director-agent-appearance-row > span {
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.director-agent-appearance-row input[type="range"] {
+  width: 100%;
+  accent-color: rgb(77 143 248);
+  cursor: pointer;
+}
+
+.director-agent-appearance-row input[type="checkbox"] {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 19px;
+  border: none;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.16);
+  cursor: pointer;
+  appearance: none;
+  transition: background-color 0.16s ease;
+}
+
+.director-agent-appearance-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.16s ease;
+}
+
+.director-agent-appearance-row input[type="checkbox"]:checked {
+  background: rgb(77 143 248);
+}
+
+.director-agent-appearance-row input[type="checkbox"]:checked::after {
+  transform: translateX(15px);
+}
+
+/* 紧凑模式 */
+.director-agent-panel.is-compact.is-floating {
+  width: 300px;
+}
+
+.director-agent-panel.is-compact.is-docked {
+  width: 320px;
+}
+
+.director-agent-panel.is-compact .director-agent-panel-header {
+  min-height: 34px;
+}
+
+.director-agent-panel.is-compact .director-agent-panel-messages {
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.director-agent-panel.is-compact .director-agent-panel-bubble {
+  padding: 6px 9px;
+  font-size: 11.5px;
+}
+
+.director-agent-panel.is-compact .director-agent-panel-input {
+  min-height: 40px;
+  font-size: 12px;
+}
+
+.director-agent-panel.is-compact .director-agent-panel-hint {
+  font-size: 11px;
 }

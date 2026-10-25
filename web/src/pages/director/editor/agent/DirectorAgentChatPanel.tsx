@@ -5,8 +5,8 @@ import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/
 
 import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirectorAgentChat";
 
-/** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置持久化。 */
-type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean };
+/** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置与外观持久化。 */
+type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean; glassAlpha: number; compact: boolean };
 
 const LAYOUT_STORAGE_KEY = "director-agent-panel-layout-v1";
 const DOCK_SNAP_DISTANCE = 56;
@@ -18,13 +18,20 @@ function loadLayout(): PanelLayout {
         if (raw) {
             const parsed = JSON.parse(raw) as Partial<PanelLayout>;
             if (parsed.mode === "left" || parsed.mode === "right" || parsed.mode === "float") {
-                return { mode: parsed.mode, x: Number(parsed.x) || 80, y: Number(parsed.y) || 80, collapsed: Boolean(parsed.collapsed) };
+                return {
+                    mode: parsed.mode,
+                    x: Number(parsed.x) || 80,
+                    y: Number(parsed.y) || 80,
+                    collapsed: Boolean(parsed.collapsed),
+                    glassAlpha: typeof parsed.glassAlpha === "number" ? Math.min(0.92, Math.max(0.3, parsed.glassAlpha)) : 0.68,
+                    compact: Boolean(parsed.compact),
+                };
             }
         }
     } catch {
         // 布局损坏时用默认值
     }
-    return { mode: "right", x: 0, y: 0, collapsed: false };
+    return { mode: "right", x: 0, y: 0, collapsed: false, glassAlpha: 0.68, compact: false };
 }
 
 function saveLayout(layout: PanelLayout) {
@@ -167,9 +174,19 @@ export function DirectorAgentChatPanel() {
     const [layout, setLayout] = useState<PanelLayout>(loadLayout);
     const [dragging, setDragging] = useState(false);
     const [draft, setDraft] = useState("");
+    const [showAppearance, setShowAppearance] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
     const panelRef = useRef<HTMLElement>(null);
+
+    // 文本框随内容自适应高度（上限 140px，超出内部滚动）
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    }, [draft]);
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -270,9 +287,9 @@ export function DirectorAgentChatPanel() {
     return (
         <aside
             ref={panelRef}
-            className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""}`}
+            className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""} ${layout.compact ? "is-compact" : ""}`}
             data-dock={docked ? layout.mode : undefined}
-            style={floatStyle}
+            style={{ ...(floatStyle || {}), "--director-agent-glass-alpha": layout.glassAlpha } as React.CSSProperties}
             role="dialog"
             aria-label="AI 助手"
         >
@@ -318,9 +335,9 @@ export function DirectorAgentChatPanel() {
                     </div>
                     <div className="director-agent-panel-composer">
                         <textarea
+                            ref={textareaRef}
                             className="director-agent-panel-input"
                             placeholder="让 AI 助手帮你操作导演台…"
-                            rows={2}
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
                             onKeyDown={(event) => {
@@ -330,15 +347,33 @@ export function DirectorAgentChatPanel() {
                                 }
                             }}
                         />
+                        {showAppearance ? (
+                            <div className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
+                                <label className="director-agent-appearance-row is-column">
+                                    <span>毛玻璃透明度</span>
+                                    <input
+                                        type="range"
+                                        min={30}
+                                        max={92}
+                                        value={Math.round(layout.glassAlpha * 100)}
+                                        onChange={(event) => updateLayout({ glassAlpha: Number(event.target.value) / 100 })}
+                                    />
+                                </label>
+                                <label className="director-agent-appearance-row">
+                                    <span>紧凑模式</span>
+                                    <input type="checkbox" checked={layout.compact} onChange={(event) => updateLayout({ compact: event.target.checked })} />
+                                </label>
+                            </div>
+                        ) : null}
                         <div className="director-agent-panel-composer-bar">
                             <AgentModelRow />
                             <div className="director-agent-panel-composer-tools">
                                 <button
                                     type="button"
-                                    className="director-agent-panel-icon-button"
-                                    aria-label="打开模型配置"
-                                    title="模型配置"
-                                    onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
+                                    className={`director-agent-panel-icon-button${showAppearance ? " is-active" : ""}`}
+                                    aria-label="助手外观设置"
+                                    title="助手外观设置"
+                                    onClick={() => setShowAppearance((value) => !value)}
                                 >
                                     <SlidersHorizontal aria-hidden="true" size={14} />
                                 </button>
