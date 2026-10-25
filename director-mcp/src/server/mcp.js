@@ -77,7 +77,7 @@ async function respondTo(message) {
     }
 }
 
-async function handleMethod(method, params) {
+export async function handleMethod(method, params) {
     switch (method) {
         case "initialize":
             return {

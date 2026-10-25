@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
 import { DirectorBridge, ToolError } from "./bridge.js";
+import { handleMethod as handleMcpMethod } from "./mcp.js";
 import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
 const PORT = Number(process.env.STORE_PORT || 17372);
@@ -105,6 +106,42 @@ const server = http.createServer(async (req, res) => {
         }
 
         if (group === "events" && req.method === "GET") return bridge.openEvents(url, res);
+
+        // MCP over HTTP（streamable HTTP 的无状态子集）：外部 harness 无法拉起 stdio 进程时用这个门面
+        if (group === "mcp") {
+            if (req.method !== "POST") {
+                res.setHeader("allow", "POST");
+                return sendJson(res, 405, { ok: false, error: "POST JSON-RPC 2.0 messages to /mcp" });
+            }
+            const message = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+            if (!message || typeof message !== "object") return sendJson(res, 400, { ok: false, error: "bad json-rpc message" });
+            if (message.id === undefined || message.id === null) return send(res, 202, "");
+            try {
+                const result = await handleMcpMethod(String(message.method || ""), message.params || {});
+                return sendJson(res, 200, { jsonrpc: "2.0", id: message.id, result });
+            } catch (error) {
+                const payload = error && typeof error === "object" ? error : {};
+                return sendJson(res, 200, {
+                    jsonrpc: "2.0",
+                    id: message.id,
+                    error: { code: payload.code === "unknown_tool" || payload.code === -32601 ? -32602 : -32000, message: payload.message || String(error), data: { ...(payload.code ? { code: payload.code } : {}), ...(payload.hint ? { hint: payload.hint } : {}) } },
+                });
+            }
+        }
+
+        // skill 文档下发（DeepSeek harness / 人工阅读两用），随包内置：director-mcp/skills/
+        if (group === "skills") {
+            const skillsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "skills");
+            if (!key && req.method === "GET") {
+                const names = fs.existsSync(skillsDir) ? fs.readdirSync(skillsDir, { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => item.name) : [];
+                return sendJson(res, 200, { ok: true, skills: names });
+            }
+            if (key && req.method === "GET") {
+                const file = join(skillsDir, key, "SKILL.md");
+                if (!fs.existsSync(file)) return sendJson(res, 404, { ok: false, error: "skill not found" });
+                return send(res, 200, fs.readFileSync(file), { "content-type": "text/markdown; charset=utf-8" });
+            }
+        }
 
         if (group === "director") {
             if (key === "ready" && req.method === "POST") {
