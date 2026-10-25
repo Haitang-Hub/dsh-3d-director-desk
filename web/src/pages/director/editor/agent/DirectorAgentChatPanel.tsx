@@ -118,11 +118,13 @@ function TurnView({ turn }: { turn: AgentTurn }) {
     );
 }
 
-/** 输入框内的模型选择：紧凑无边框下拉，融入输入容器左下角。 */
+/** 输入框内的模型选择：自绘无边框下拉（原生 select 的弹出列表无法定制样式）。 */
 function AgentModelRow() {
     const channels = useConfigStore((state) => state.config.channels);
     const textModel = useConfigStore((state) => state.config.textModel);
     const updateConfig = useConfigStore((state) => state.updateConfig);
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
 
     // 只列 text 类模型；渠道里没有标注 text 的模型时整渠道兜底显示（capability 猜测可能不准）
     const textModelsOf = (channel: ModelChannel) => {
@@ -132,33 +134,71 @@ function AgentModelRow() {
     const options = channels.flatMap((channel) =>
         textModelsOf(channel).map((model) => ({ value: encodeChannelModel(channel.id, model.name), label: channel.name ? `${model.name} (${channel.name})` : model.name })),
     );
-    const hasOptions = options.length > 0;
 
-    // textModel 是历史遗留值/已失效时归一到第一个可选项，保证选择框显示的就是实际用的模型
+    // textModel 是历史遗留值/已失效时归一到第一个可选项，保证显示的就是实际用的模型
     useEffect(() => {
-        if (hasOptions && !options.some((option) => option.value === textModel)) {
+        if (options.length && !options.some((option) => option.value === textModel)) {
             updateConfig("textModel", options[0].value);
         }
-    }, [hasOptions, textModel, options, updateConfig]);
+    }, [textModel, options, updateConfig]);
+
+    // 点击外部 / Esc 关闭
+    useEffect(() => {
+        if (!open) return;
+        function onPointerDown(event: PointerEvent) {
+            if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+        }
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") setOpen(false);
+        }
+        document.addEventListener("pointerdown", onPointerDown);
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown);
+            document.removeEventListener("keydown", onKeyDown);
+        };
+    }, [open]);
+
+    const selectedLabel = options.find((option) => option.value === textModel)?.label;
 
     return (
-        <select
-            className="director-agent-model-select"
-            value={hasOptions ? textModel : ""}
-            onChange={(event) => updateConfig("textModel", event.target.value)}
-            aria-label="选择模型"
-            title="AI 助手使用的对话模型"
-        >
-            {hasOptions ? (
-                options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))
-            ) : (
-                <option value="">未配置模型 · 请在「模型配置」添加渠道</option>
-            )}
-        </select>
+        <div className="director-agent-model-select" ref={rootRef}>
+            <button
+                type="button"
+                className="director-agent-model-trigger"
+                aria-label="选择模型"
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                title="AI 助手使用的对话模型"
+                onClick={() => setOpen((value) => !value)}
+            >
+                <span className="director-agent-model-label">{selectedLabel || "未配置模型"}</span>
+                <ChevronDown aria-hidden="true" size={13} className={`director-agent-model-caret${open ? " is-open" : ""}`} />
+            </button>
+            {open ? (
+                <div className="director-agent-model-menu" role="listbox" aria-label="模型列表">
+                    {options.length ? (
+                        options.map((option) => (
+                            <button
+                                key={option.value}
+                                type="button"
+                                role="option"
+                                aria-selected={option.value === textModel}
+                                className={`director-agent-model-option${option.value === textModel ? " is-selected" : ""}`}
+                                onClick={() => {
+                                    updateConfig("textModel", option.value);
+                                    setOpen(false);
+                                }}
+                            >
+                                {option.label}
+                            </button>
+                        ))
+                    ) : (
+                        <div className="director-agent-model-empty">未配置模型 · 请在「模型配置」添加渠道</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
     );
 }
 

@@ -275,33 +275,110 @@
   height: 28px;
 }
 
-/* 输入框内的模型选择：无边框透明下拉 */
+/* 输入框内的模型选择：自绘无边框下拉 */
 .director-agent-model-select {
+  position: relative;
   min-width: 0;
-  max-width: 250px;
-  overflow: hidden;
+}
+
+.director-agent-model-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 260px;
   border: none;
   border-radius: 8px;
-  padding: 5px 6px;
+  padding: 5px 7px;
   font-family: inherit;
   font-size: 12.5px;
-  color: rgb(var(--text-muted-rgb));
+  color: rgb(var(--text-rgb));
   background: transparent;
   outline: none;
-  text-overflow: ellipsis;
   cursor: pointer;
   transition: color 0.16s ease, background-color 0.16s ease;
 }
 
-.director-agent-model-select:hover {
-  color: rgb(var(--text-rgb));
-  background: rgb(140 175 255 / 0.12);
+.director-agent-model-trigger:hover,
+.director-agent-model-trigger[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.08);
 }
 
-.director-agent-model-select:focus {
+.director-agent-model-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.director-agent-model-caret {
+  flex-shrink: 0;
+  color: rgb(var(--text-muted-rgb));
+  transition: transform 0.16s ease;
+}
+
+.director-agent-model-caret.is-open {
+  transform: rotate(180deg);
+}
+
+.director-agent-model-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 216px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  padding: 4px;
+  background: rgb(12 18 34 / 0.92);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.director-agent-model-menu::-webkit-scrollbar {
+  width: 7px;
+}
+
+.director-agent-model-menu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+}
+
+.director-agent-model-option {
+  overflow: hidden;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--text-muted-rgb));
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.14s ease, background-color 0.14s ease;
+}
+
+.director-agent-model-option:hover {
   color: rgb(var(--text-rgb));
-  background: rgb(140 175 255 / 0.12);
-  box-shadow: none;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.director-agent-model-option.is-selected {
+  color: rgb(150 190 255);
+  background: rgb(77 143 248 / 0.18);
+}
+
+.director-agent-model-empty {
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: rgb(var(--text-muted-rgb));
 }
 
 .director-agent-panel-input {
