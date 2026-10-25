@@ -8,6 +8,7 @@
  */
 
 import fs from "node:fs";
+import http from "node:http";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +29,25 @@ if (command === "mcp") {
     startHttpServer();
 }
 
+/** 一次性 GET（禁用 keep-alive，避免 doctor 退出时 libuv 断言）。 */
+function getJson(url) {
+    return new Promise((resolvePromise) => {
+        const req = http.get(url, { agent: new http.Agent({ keepAlive: false }) }, (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+                try {
+                    resolvePromise({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks).toString("utf8")) });
+                } catch {
+                    resolvePromise({ status: res.statusCode, body: null });
+                }
+            });
+        });
+        req.setTimeout(2000, () => req.destroy(new Error("timeout")));
+        req.on("error", () => resolvePromise(null));
+    });
+}
+
 /** 自检：桥是否在线、executor 是否就绪、data 目录是否可写、协议版本是否匹配。 */
 async function runDoctor() {
     let failures = 0;
@@ -36,26 +56,15 @@ async function runDoctor() {
 
     console.log(`${SERVER_NAME} doctor (v${SERVER_VERSION}, bridge protocol v${DIRECTOR_PROTOCOL_VERSION})`);
 
-    let health = null;
-    try {
-        const res = await fetch(`${BRIDGE_URL}/health`, { signal: AbortSignal.timeout(2000) });
-        health = res.ok ? await res.json() : null;
-    } catch {
-        // 桥未在线
-    }
-    if (health?.ok) pass(`桥在线：${BRIDGE_URL}（data dir: ${health.dataDir}）`);
+    const health = await getJson(`${BRIDGE_URL}/health`);
+    if (health?.body?.ok) pass(`桥在线：${BRIDGE_URL}（data dir: ${health.body.dataDir}）`);
     else fail(`桥不在线：${BRIDGE_URL} —— 在 director-mcp 目录运行 node index.js（或用 start.bat 启动）`);
 
-    if (health?.ok) {
-        try {
-            const res = await fetch(`${BRIDGE_URL}/director/status`, { signal: AbortSignal.timeout(2000) });
-            const status = await res.json();
-            const ready = (status.executors || []).filter((item) => item.ready);
-            if (ready.length) pass(`executor 在线 ${ready.length} 个：${ready.map((item) => item.deskId || "(未指定 desk)").join(", ")}`);
-            else fail("没有已就绪的导演台页面 —— 打开 http://localhost:5080 并进入一个导演台编辑器后重试");
-        } catch (error) {
-            fail(`executor 状态查询失败：${error instanceof Error ? error.message : error}`);
-        }
+    if (health?.body?.ok) {
+        const status = await getJson(`${BRIDGE_URL}/director/status`);
+        const ready = (status?.body?.executors || []).filter((item) => item.ready);
+        if (ready.length) pass(`executor 在线 ${ready.length} 个：${ready.map((item) => item.deskId || "(未指定 desk)").join(", ")}`);
+        else fail("没有已就绪的导演台页面 —— 打开 http://localhost:5080 并进入一个导演台编辑器后重试");
     }
 
     try {
