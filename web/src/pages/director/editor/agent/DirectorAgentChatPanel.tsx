@@ -104,7 +104,7 @@ function AgentModelConfig() {
                         ) : [];
                     })}
                 </select>
-                <p className="director-agent-config-note">AI 助手的对话与工具调用都走这个模型。</p>
+                <p className="director-agent-config-note">Agent的对话与工具调用都走这个模型。</p>
             </section>
 
             <section className="director-agent-config-section">
@@ -293,7 +293,7 @@ export function DirectorAgentChatPanel() {
             data-dock={docked ? layout.mode : undefined}
             style={floatStyle}
             role="dialog"
-            aria-label="AI 助手"
+            aria-label="Agent"
         >
             <header
                 className="director-agent-panel-header"
@@ -306,7 +306,7 @@ export function DirectorAgentChatPanel() {
                 <span className="director-agent-panel-title">
                     <Bot aria-hidden="true" size={15} className={docked ? "director-agent-panel-dock-hint" : ""} />
                     <span>
-                        AI 助手
+                        Agent
                         {showBody ? <span className="director-agent-panel-model"> · {model}</span> : null}
                     </span>
                 </span>
@@ -324,7 +324,7 @@ export function DirectorAgentChatPanel() {
                         <Trash2 aria-hidden="true" size={14} />
                     </button>
                 ) : null}
-                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 AI 助手" title="关闭" onClick={() => setOpen(false)}>
+                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 Agent" title="关闭" onClick={() => setOpen(false)}>
                     <X aria-hidden="true" size={15} />
                 </button>
             </header>
@@ -391,7 +391,7 @@ export function DirectorAgentChatPanel() {
     );
 }
 
-/** 顶栏「AI 助手」开关按钮。 */
+/** 顶栏「Agent」开关按钮。 */
 export function DirectorAgentChatToggle() {
     const open = useDirectorAgentChat((state) => state.open);
     const toggle = useDirectorAgentChat((state) => state.toggle);
@@ -399,12 +399,12 @@ export function DirectorAgentChatToggle() {
         <button
             className={`top-bar-motion-button${open ? " is-active" : ""}`}
             type="button"
-            aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
+            aria-label={open ? "关闭 Agent" : "打开 Agent"}
             aria-pressed={open}
             onClick={toggle}
         >
             <Bot aria-hidden="true" size={15} />
-            AI 助手
+            Agent
         </button>
     );
 }

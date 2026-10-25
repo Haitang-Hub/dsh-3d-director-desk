@@ -2134,3 +2134,8 @@
     flex-wrap: wrap;
   }
 }
+
+/* 视口坐标轴 gizmo 下移，避开悬浮顶栏（顶栏占 y=16~64） */
+.app-shell .viewport-gizmo-overlay {
+  top: 76px;
+}
