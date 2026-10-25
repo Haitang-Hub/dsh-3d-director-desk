@@ -1522,6 +1522,7 @@
 
 .app-shell .top-bar-left,
 .app-shell .top-bar-center,
+.app-shell .top-bar-right,
 .app-shell .top-bar-actions {
   height: 48px;
   border: 0;
@@ -1583,6 +1584,8 @@
 .app-shell .top-bar-right {
   justify-self: end;
   padding: 8px;
+  /* 右上角固定定位的关闭按钮（.director-close-button，40px + 边距）压在本组上，预留空间避免遮挡 */
+  padding-right: 56px;
   display: flex;
   align-items: center;
   gap: 6px;
