@@ -1552,40 +1552,10 @@
   padding: 8px;
 }
 
-.director-close-button {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 200;
-  pointer-events: auto;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 0.08);
-  color: rgb(var(--text-rgb));
-  cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: background 0.15s ease, transform 0.12s ease;
-}
-
-.director-close-button:hover {
-  background: rgb(255 255 255 / 0.14);
-  transform: scale(1.06);
-}
-
-.director-close-button:active {
-  transform: scale(0.95);
-}
 
 .app-shell .top-bar-right {
   justify-self: end;
   padding: 8px;
-  /* 右上角固定定位的关闭按钮（.director-close-button，40px + 边距）压在本组上，预留空间避免遮挡 */
-  padding-right: 56px;
   display: flex;
   align-items: center;
   gap: 6px;

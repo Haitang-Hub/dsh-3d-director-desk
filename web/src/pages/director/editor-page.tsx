@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Route, X } from "lucide-react";
+import { Route } from "lucide-react";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
@@ -167,10 +167,6 @@ export default function DirectorEditorPage() {
     navigate("/director");
   }
 
-  function handleBack() {
-    window.history.back();
-  }
-
   return (
     <div className="h-dvh w-full overflow-hidden">
       <DirectorAgentBridge />
@@ -244,11 +240,6 @@ export default function DirectorEditorPage() {
             <div className="top-bar-right">
               <DirectorAgentChatToggle />
               {/* 模型配置入口移入 AI 助手面板（标题栏齿轮） */}
-              {motionStudioOpen ? null : (
-                <button className="director-close-button" type="button" title="关闭" onClick={(e) => { e.stopPropagation(); handleBack(); }}>
-                  <X aria-hidden="true" size={18} strokeWidth={2} />
-                </button>
-              )}
             </div>
           </header>
           <DirectorDeskShell>
