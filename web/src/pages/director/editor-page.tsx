@@ -1,6 +1,6 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, FolderOpen, Route, Settings2 } from "lucide-react";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -109,7 +109,6 @@ function DirectorDeskNameField({ desks, activeDeskId, onChange }: { desks: Direc
 
 // 3D 导演台编辑器:全屏独立页面：全屏独立页面（不含无限画布顶部导航），URL 参数 instanceId 是导演台的唯一入口。
 export default function DirectorEditorPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const benchmarkMode = getPerformanceBenchmarkMode(window.location.search);
   const urlInstanceId = searchParams.get("instanceId")?.trim() || null;
@@ -236,7 +235,7 @@ export default function DirectorEditorPage() {
               <button className="top-bar-icon-button" type="button" title="工程目录（新建 / 导入 / 删除 / 切换）" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
                 <FolderOpen aria-hidden="true" size={15} />
               </button>
-              <button className="top-bar-icon-button" type="button" title="帮助文档" aria-label="打开帮助文档" onClick={() => navigate("/help")}>
+              <button className="top-bar-icon-button" type="button" title="帮助文档（新窗口打开）" aria-label="打开帮助文档" onClick={() => window.open("/help", "_blank", "noopener")}>
                 <BookOpen aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField
