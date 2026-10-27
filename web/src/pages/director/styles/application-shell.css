@@ -2037,6 +2037,41 @@
   border-radius: 7px;
 }
 
+/* 顶栏响应式收纳：窄窗口/插件面板下中心簇逐级压缩，名称省略号截断 */
+@media (max-width: 1320px) {
+  .app-shell .top-bar-center {
+    gap: 4px;
+  }
+
+  .app-shell .top-bar-motion-button,
+  .app-shell .viewport-sensitivity-trigger,
+  .app-shell .performance-settings-trigger,
+  .app-shell .export-trigger {
+    padding: 0 8px;
+  }
+
+  .app-shell .mode-toggle {
+    width: 172px;
+  }
+}
+
+@media (max-width: 1150px) {
+  .app-shell .viewport-sensitivity-trigger,
+  .app-shell .performance-settings-trigger,
+  .app-shell .export-trigger {
+    width: 32px;
+    min-width: 32px;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+    justify-content: center;
+  }
+
+  .app-shell .performance-settings-trigger small {
+    display: none;
+  }
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     --left-sidebar-width: 218px;
@@ -2165,6 +2200,8 @@
 .app-shell .director-desk-name {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgb(var(--border-rgb) / 0.28);
@@ -2177,6 +2214,12 @@
   cursor: text;
   user-select: none;
   transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.app-shell .director-desk-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-shell .director-desk-name:hover {

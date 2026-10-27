@@ -97,7 +97,7 @@ function DirectorDeskNameField({ desks, activeDeskId, onChange }: { desks: Direc
   }
   return (
     <span className="director-desk-name" title="双击修改导演台名称" onDoubleClick={() => setEditing(true)}>
-      {active?.name || "未命名导演台"}
+      <span className="director-desk-name-text">{active?.name || "未命名导演台"}</span>
     </span>
   );
 }
