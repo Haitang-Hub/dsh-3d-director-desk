@@ -1,0 +1,25 @@
+# 插件树插入项：
+# 1. 本工作台服务端入口（拉起 director-mcp 桥进程、暴露 bridge-info / session-ownership）
+# 2. dsh-mcp-client 条目：把桥的 /mcp HTTP 门面注册为 mcp__director-desk__* 工具
+#
+# 端口单一事实来源：DIRECTOR_DESK_PORT（默认 17372）。本文件与 dsh/index.js 的
+# Config.port 都读它，改端口只改这一处，避免 url 与插件配置两处写死后静默错配。
+- insert:
+    - id: dsh-3d-director-desk
+      name: dsh-3d-director-desk
+      config:
+        root: !!js dshHomePath('3d-director-desk')
+    - id: mcp-director-desk
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: director-desk
+        transport: streamable-http
+        # 整个表达式必须写成 YAML 单引号标量：!!js 后面接裸表达式时，YAML 会在 `+` 处判成缩进错误。
+        url: !!js '"http://127.0.0.1:" + (process.env.DIRECTOR_DESK_PORT ?? "17372") + "/mcp"'
+        toolCallTimeoutMs: 600000
+        # 桥由本插件在 apply 里异步拉起，首次连接可能早于 /health 就绪；
+        # 默认 10 次退避在本机重启桥时太短，放宽到约 10 分钟持续重连。
+        reconnect:
+          initialDelayMs: 500
+          maxDelayMs: 5000
+          maxAttempts: 120

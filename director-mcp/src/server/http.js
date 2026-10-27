@@ -40,7 +40,11 @@ const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(
 // 打包布局（dsh-plugin/bridge 同级的 site/）> 仓库布局（web/dist）。
 const SITE_CANDIDATES = [
     process.env.DIRECTOR_SITE_DIR?.trim(),
+    // 打包布局：<pkg>/bridge/src/server → 上溯 3 级 = <pkg>/site
     join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "site"),
+    // 仓库布局：<repo>/director-mcp/src/server → 上溯 3 级 = <repo>/web/dist
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "web", "dist"),
+    // 兜底：旧的多一层布局
     join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "web", "dist"),
 ].filter(Boolean).map((dir) => resolve(dir));
 const SITE_DIR = SITE_CANDIDATES.find((dir) => fs.existsSync(join(dir, "index.html"))) || "";

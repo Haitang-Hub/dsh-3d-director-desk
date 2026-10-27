@@ -1,0 +1,4 @@
+# 生成目录：由 scripts/sync-assets.mjs 从上游权威源同步，不入库
+bridge/
+site/
+*.tgz
