@@ -2,15 +2,15 @@
  * dsh-3d-director-desk 服务端入口（Cordis 插件，运行于 Harness 进程）。
  *
  * 职责：
- *   1. 以子进程方式拉起 director-mcp 桥（127.0.0.1，默认 17372），
- *      数据目录指到 dshHomePath('3d-director-desk')，生命周期随本插件 effect 管理；
- *   2. 暴露 /api/director-desk.bridge-info，供客户端面板发现桥端口与就绪状态；
- *   3. 暴露 /api/director-desk.session-ownership，把宿主只读服务
- *      desktopWorkbenchOwnership 的归属快照转给面板（会话绑定数）；
- *   4. 就绪失败保留最内层错误（spawn 错误 / 端口占用 / 健康超时分别可定位）。
+ *   1. 托管本地桥（director-mcp，127.0.0.1:17372）：能复用就复用，不能就自己拉起；
+ *      **8 秒心跳**复查，桥掉线自动重建 —— 之前只“复用不监管”，外部桥一退出面板就黑屏；
+ *   2. 暴露 GET /api/director-desk.bridge-info，面板据此显示画布或恢复引导；
+ *   3. 暴露 POST /api/director-desk.restart-bridge，让用户在面板上手动重建服务；
+ *   4. 对外部桥做**能力探测**：/health 健康还不够，`GET /` 必须是含 `id="root"` 的 HTML，
+ *      否则 iframe 只会拿到 JSON 404（实测踩过）。
  *
- * 工具注册不在本入口：cordis.patch.yml 里的 dsh-mcp-client 条目把桥的
- * /mcp HTTP 门面注册为 mcp__director-desk__* 原生工具（streamable-http）。
+ * 工具注册不在本入口：cordis.patch.yml 里的 dsh-mcp-client 条目把桥的 /mcp 门面
+ * 注册为 mcp__director-desk__* 原生工具。
  */
 
 import { spawn } from 'node:child_process'
@@ -22,20 +22,20 @@ import Schema from '@deepseek-ai/schemastery'
 export const name = 'dsh-3d-director-desk'
 export const inject = ['connection']
 
-/** 工作台身份（小写 owner/repo），与 Desktop 的归属登记同一口径。 */
-const WORKBENCH_ID = 'haitang-hub/dsh-3d-director-desk'
-
 /**
  * 端口单一事实来源：本插件的 Config.port 与 cordis.patch.yml 里 mcp 条目的 url
- * 共用 DIRECTOR_DESK_PORT。改端口只改这一处，避免两处写死后静默错配。
+ * 共用 DIRECTOR_DESK_PORT。改端口只改这一处。
  */
 const DEFAULT_PORT = Number(process.env.DIRECTOR_DESK_PORT ?? 17372)
 
+/** 心跳间隔：桥掉线后最多 8 秒面板就能看到状态翻转并自动重建。 */
+const HEARTBEAT_MS = 8000
+
 export const Config = Schema.object({
-  root: Schema.string().required().description('工作台数据目录（dshHomePath），存放导演台工程与资产'),
+  root: Schema.string().required().description('桥的数据目录（dshHomePath），存放导演台工程与资产'),
   port: Schema.number().default(DEFAULT_PORT).description('桥监听端口，仅本机回环；与 cordis.patch.yml 的 mcp url 共用 DIRECTOR_DESK_PORT'),
   host: Schema.string().default('127.0.0.1').description('桥绑定地址，保持回环；开放到外网前必须先给免 token 端点加鉴权'),
-  spawn: Schema.boolean().default(true).description('是否由本插件拉起桥进程；false 时使用外部已启动的桥（开发态 start.bat 场景）'),
+  spawn: Schema.boolean().default(true).description('插件是否托管桥进程；false 时只复用外部已启动的桥'),
   startupTimeoutMs: Schema.number().default(15000).description('等待桥 /health 就绪的超时'),
 })
 
@@ -76,8 +76,8 @@ async function waitForHealth(url, timeoutMs, signal) {
 }
 
 /**
- * 探测端口上已存在的桥：不仅要 /health 健康，还要它真的能伺服工作台站点。
- * listening 表示端口已被占用（哪怕对面不是我们的桥），调用方据此决定“复用”还是“报错”，
+ * 探测端口上既有的 HTTP 服务：健康 + 站点能力。
+ * `listening=true` 表示端口已被占用（哪怕对面不是我们的桥），调用方据此决定复用还是报错，
  * 而不是盲目 spawn 撞 EADDRINUSE。
  */
 async function probeBridge(baseUrl) {
@@ -104,127 +104,146 @@ async function probeBridge(baseUrl) {
   }
 }
 
-/** 归属快照 -> 本工作台的会话数。旧数据可能是字符串 owner，也可能是 `{ id }`，两种都认。 */
-function countOwnedSessions(snapshot) {  const bindings = snapshot?.sessionBindings ?? {}
-  let count = 0
-  for (const owner of Object.values(bindings)) {
-    const id = typeof owner === 'string' ? owner : owner?.id ?? owner?.workbenchId
-    if (id === WORKBENCH_ID) count += 1
-  }
-  return count
-}
-
 export async function apply(ctx, config) {
   const baseUrl = `http://${config.host}:${config.port}`
-  const bridgeInfo = { ready: false, host: config.host, port: config.port }
+  const bridgeEntry = fileURLToPath(new URL('../bridge/index.js', import.meta.url))
+  const siteDir = fileURLToPath(new URL('../site', import.meta.url))
 
-  // 注册即 effect：面板在任何时刻都能拿到桥状态；停用/HMR 重载时路由随 effect 一起移除，
-  // 避免同一进程里残留旧闭包（旧的 bridgeInfo 永远停在 ready=false）。
+  const state = {
+    ready: false,
+    starting: false,
+    child: null,
+    error: undefined,
+    restarts: 0,
+  }
+
+  /** 面板读取的稳定快照：只含可 JSON 化的状态，不含子进程句柄。 */
+  const snapshot = () => ({
+    ready: state.ready,
+    host: config.host,
+    port: config.port,
+    supervised: config.spawn,
+    restarts: state.restarts,
+    ...(state.error ? { error: state.error } : {}),
+  })
+
+  // 注册即 effect：面板任何时刻都能拿到状态；停用/HMR 时路由随之移除。
   ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/director-desk.bridge-info',
     methods: ['GET'],
     requestBody: 'buffered',
-    fetch: () => Response.json(bridgeInfo, { headers: { 'Cache-Control': 'no-store' } }),
+    fetch: () => Response.json(snapshot(), { headers: { 'Cache-Control': 'no-store' } }),
   }))
 
-  // 会话归属：desktopWorkbenchOwnership 由 dsh-desktop-workbenches 以只读服务提供。
-  // 不写进 inject —— 该服务缺失时不能让整个工作台激活失败；每次请求用 ctx.get 现查，
-  // 服务晚到（工作台服务先加载）也能生效。缺失时返回 503，面板降级为只显示业务面板。
+  /** 拉起打包内的桥，并等它健康。返回是否成功（失败原因写进 state.error）。 */
+  async function spawnBridge() {
+    await mkdir(config.root, { recursive: true })
+    ctx.logger.info('director-desk: spawning bridge; port=%s dataDir=%s siteDir=%s', config.port, config.root, siteDir)
+    const child = spawn(process.execPath, [bridgeEntry], {
+      env: {
+        ...scrubbedEnv(),
+        DIRECTOR_STORE_DIR: config.root,
+        // 显式传站点目录：不依赖桥内部按相对路径上溯的猜测（仓库布局与打包布局层数不同）
+        DIRECTOR_SITE_DIR: siteDir,
+        STORE_PORT: String(config.port),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    let spawnError = null
+    child.on('error', error => { spawnError = error })
+    child.on('exit', code => {
+      if (state.child !== child) return
+      state.child = null
+      state.ready = false
+      if (code !== 0 && code !== null) state.error = `桥进程退出（code=${code}），稍后自动重启`
+    })
+    const pipe = (stream, level) => {
+      stream?.on('data', chunk => {
+        const text = String(chunk).trim()
+        if (text) ctx.logger[level]('director-desk bridge: %s', text.slice(0, 2000))
+      })
+    }
+    pipe(child.stdout, 'info')
+    pipe(child.stderr, 'warn')
+    state.child = child
+
+    try {
+      await waitForHealth(`${baseUrl}/health`, config.startupTimeoutMs, undefined)
+      state.ready = true
+      state.error = undefined
+      return true
+    } catch (error) {
+      const cause = spawnError ? `spawn failed: ${spawnError.message}` : error.message
+      try { child.kill() } catch { /* 已经退出 */ }
+      if (state.child === child) state.child = null
+      state.ready = false
+      state.error = `桥启动失败：${cause}`
+      ctx.logger.error('director-desk: bridge startup failed; port=%s cause=%s', config.port, cause)
+      return false
+    }
+  }
+
+  /**
+   * 保证桥可用。`force` 为真时忽略现有桥（先杀掉自己托管的子进程再重建）。
+   * 心跳与手动重启都走这里，避免两处逻辑漂移。
+   */
+  async function ensureBridge(force) {
+    if (state.starting) return
+    state.starting = true
+    try {
+      if (force && state.child) {
+        try { state.child.kill() } catch { /* 已经退出 */ }
+        state.child = null
+        state.ready = false
+      }
+      if (!force) {
+        const probe = await probeBridge(baseUrl)
+        if (probe.ok) {
+          if (!state.ready) ctx.logger.info('director-desk: reusing healthy bridge; url=%s', baseUrl)
+          state.ready = true
+          state.error = undefined
+          return
+        }
+        state.ready = false
+        if (probe.listening) {
+          // 端口被别的进程占着且不能伺服站点：不要 spawn（只会 EADDRINUSE），给出可操作原因。
+          state.error = `端口 ${config.port} 被占用，且该进程无法提供导演台站点（${probe.reason}）。关闭它后会自动重试。`
+          return
+        }
+      }
+      if (!config.spawn) {
+        state.error = '插件配置 spawn=false，只复用外部桥；当前没有可用桥'
+        return
+      }
+      if (await spawnBridge()) state.restarts += 1
+    } finally {
+      state.starting = false
+    }
+  }
+
+  // 手动重启：给面板一个“不用重启应用就能恢复画布”的按钮。
   ctx.effect(() => ctx.connection.fetch.register({
-    path: '/api/director-desk.session-ownership',
-    methods: ['GET'],
+    path: '/api/director-desk.restart-bridge',
+    methods: ['POST'],
     requestBody: 'buffered',
     async fetch() {
-      const service = ctx.get('desktopWorkbenchOwnership')
-      if (!service) {
-        return Response.json(
-          { ok: false, reason: 'ownership-unavailable' },
-          { status: 503, headers: { 'Cache-Control': 'no-store' } },
-        )
-      }
-      try {
-        const snapshot = await service.read()
-        return Response.json({
-          ok: true,
-          revision: snapshot?.revision,
-          installed: Array.isArray(snapshot?.added) ? snapshot.added.includes(WORKBENCH_ID) : undefined,
-          sessions: countOwnedSessions(snapshot),
-        }, { headers: { 'Cache-Control': 'no-store' } })
-      } catch (error) {
-        return Response.json(
-          { ok: false, reason: 'ownership-read-failed', detail: String(error?.message ?? error).slice(0, 200) },
-          { status: 500, headers: { 'Cache-Control': 'no-store' } },
-        )
-      }
+      await ensureBridge(true)
+      return Response.json(snapshot(), { headers: { 'Cache-Control': 'no-store' } })
     },
   }))
 
-  // 复用已有桥前必须确认它“能伺服工作台站点”：只看 /health 会误判。
-  // 实测踩过：start.bat 起的旧桥 /health 正常，但站点路径探测失败，iframe 里只得到
-  // {"ok":false,"error":"not found"} —— 面板一片空白，用户以为插件坏了。
-  const existing = await probeBridge(`${baseUrl}`)
-  if (existing.ok) {
-    bridgeInfo.ready = true
-    ctx.logger.info('director-desk: reusing healthy bridge; url=%s', baseUrl)
-    return
-  }
+  await ensureBridge(false)
 
-  if (!config.spawn) {
-    bridgeInfo.error = `外部桥不可用：${existing.reason}`
-    ctx.logger.warn('director-desk: external bridge unusable; url=%s reason=%s', baseUrl, existing.reason)
-    return
-  }
-
-  if (existing.listening) {
-    // 端口被占但对方不提供站点：不要再 spawn（只会 EADDRINUSE），给出可操作的原因。
-    bridgeInfo.error = `端口 ${config.port} 已被其他进程占用，且该进程无法提供导演台站点（${existing.reason}）。请关闭先前启动的 director-mcp / start.bat 后重启 DSH。`
-    ctx.logger.error('director-desk: port %s occupied by an incompatible bridge; reason=%s', config.port, existing.reason)
-    return
-  }
-
-  const bridgeEntry = fileURLToPath(new URL('../bridge/index.js', import.meta.url))
-  const siteDir = fileURLToPath(new URL('../site', import.meta.url))
-  await mkdir(config.root, { recursive: true })
-  ctx.logger.info('director-desk: spawning bridge; port=%s dataDir=%s siteDir=%s', config.port, config.root, siteDir)
-
-  const child = spawn(process.execPath, [bridgeEntry], {
-    env: {
-      ...scrubbedEnv(),
-      DIRECTOR_STORE_DIR: config.root,
-      // 显式传站点目录：不依赖桥内部按相对路径上溯的猜测（仓库布局与打包布局层数不同）
-      DIRECTOR_SITE_DIR: siteDir,
-      STORE_PORT: String(config.port),
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
-  let spawnError = null
-  child.on('error', error => { spawnError = error })
-  const pipe = (stream, level) => {
-    stream?.on('data', chunk => {
-      const text = String(chunk).trim()
-      if (text) ctx.logger[level]('director-desk bridge: %s', text.slice(0, 2000))
-    })
-  }
-  pipe(child.stdout, 'info')
-  pipe(child.stderr, 'warn')
-
+  // 心跳：桥退出 / 被外部杀掉 / 端口被占后释放，都会在这里被拉回。
   ctx.effect(() => {
-    // 桥是单进程（无孙进程），kill 即可；dispose 不等待退出，避免阻塞插件停用。
-    child.kill()
+    const timer = setInterval(() => { void ensureBridge(false) }, HEARTBEAT_MS)
+    return () => {
+      clearInterval(timer)
+      if (state.child) {
+        try { state.child.kill() } catch { /* 忽略 */ }
+        state.child = null
+      }
+    }
   })
-
-  try {
-    await waitForHealth(`${baseUrl}/health`, config.startupTimeoutMs, undefined)
-  } catch (error) {
-    const cause = spawnError ? `spawn failed: ${spawnError.message}` : error.message
-    child.kill()
-    bridgeInfo.ready = false
-    bridgeInfo.error = cause
-    ctx.logger.error('director-desk: bridge startup failed; port=%s cause=%s', config.port, cause)
-    throw new Error(`director-desk bridge failed to start: ${cause}`)
-  }
-
-  bridgeInfo.ready = true
-  ctx.logger.info('director-desk: bridge ready; url=%s', baseUrl)
 }
