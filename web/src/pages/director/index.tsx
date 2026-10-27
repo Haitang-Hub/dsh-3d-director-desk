@@ -1,27 +1,12 @@
 import "./styles/index.css";
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowRight, BookOpen, Boxes, Check, Clock3, Download, Hand, Keyboard, MousePointer2, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
+import { ArrowDownToLine, ArrowRight, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
 import { useThemeStore } from "@/stores/use-theme-store";
-import {
-  createDirectorDeskRecord,
-  deleteDirectorDeskRecord,
-  ensureDirectorDeskRecordForId,
-  ensureDirectorDeskRecords,
-  readActiveDirectorDeskId,
-  touchDirectorDeskRecord,
-  writeActiveDirectorDeskId,
-  writeDirectorDeskRecords,
-  type DirectorDeskRecord,
-} from "./editor/workspaces/directorDeskRegistry";
-import { getPerformanceBenchmarkMode } from "./editor/performance/performanceBenchmark";
-import { parseProject } from "./editor/io/importProjectJson";
-import { serializeProject } from "./editor/io/exportProjectJson";
-import { isDirectorProjectShape } from "./editor/io/projectDocument";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
 const HOME_QUICK_START_STEPS = [
-  ["选择导演台", "打开已有导演台，或点击“新建导演台”创建一个空场景。"],
+  ["打开导演台", "打开网站即直接进入导演台编辑器，自动恢复上次使用的工程。"],
   ["摆人物和道具", "从工具栏添加模型，选中后使用 XYZ 三轴移动、旋转和缩放。"],
   ["记录镜头", "点击“运镜 → 开始掌镜”，用 WASD 移动，每到一个镜头按 Enter。"],
   ["预演并导出", "先“看路线”检查轨迹，再“看成片”，满意后导出 MP4 参考视频。"],
@@ -91,12 +76,12 @@ const HOME_MAC_GESTURES = [
   ["单指按下并拖动", "普通导演视角中环绕观察；掌镜时直接移动手指即可转向"],
   ["双指上下滑动", "普通视角缩放场景；掌镜模式调整镜头 FOV"],
   ["双指点按后拖动", "开启 macOS“辅助点按”后，可平移普通导演视角"],
-  ["双指滚动首页", "上下查看完整使用说明和本次更新"],
+  ["双指滚动页面", "上下查看完整使用说明和本次更新"],
   ["轻点画面", "掌镜退出锁定后，重新进入鼠标锁定"],
 ] as const;
 
 const HOME_TOOL_GROUPS = [
-  ["顶部", "首页、切换导演台、导演/第一视角、运镜工作台、视角手感"],
+  ["顶栏", "工程目录、帮助文档、工程名称（双击改名）、导演/第一视角、运镜工作台、视角手感"],
   ["视口工具栏", "移动、旋转、缩放、添加角色、路线常亮、导入模型、模型库、添加机位"],
   ["画面工具", "选择画幅、当前/四方位/十二方位截图、全屏"],
   ["底部时间轴", "回到开头、播放/暂停、拖动定位、总时长、记录点、删除当前点"],
@@ -104,55 +89,44 @@ const HOME_TOOL_GROUPS = [
   ["右侧属性", "对象 XYZ、姿势、动作、人物路线、场景地面与路径碰撞"],
 ] as const;
 
-function formatDirectorDeskUpdatedAt(value: string) {
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return "刚刚更新";
+const HOME_PROJECT_MANAGEMENT = [
+  {
+    icon: Plus,
+    title: "新建工程",
+    description: "编辑器顶栏左侧打开「工程目录」，点击“新建工程”即可创建，编号自动递增。",
+  },
+  {
+    icon: FolderOpen,
+    title: "打开与切换",
+    description: "工程目录按「编号 + 名称」列出所有本地工程，点击任意一行即可切换，当前工程会标注“（当前）”。",
+  },
+  {
+    icon: Pencil,
+    title: "重命名",
+    description: "在编辑器顶栏双击工程名称即可重命名；新建工程默认叫“导演台 N 号”，N 就是它的编号。",
+  },
+  {
+    icon: Upload,
+    title: "导入工程",
+    description: "工程目录中点击“导入工程”，选择导演台导出的 .json 工程文件，会自动建立编号并进入编辑。",
+  },
+  {
+    icon: ArrowDownToLine,
+    title: "导出工程",
+    description: "工程目录中每行都有导出按钮，生成 .director-project.json，可跨设备迁移或交给他人。",
+  },
+  {
+    icon: Trash2,
+    title: "删除工程",
+    description: "工程目录中每行都有删除按钮；删除会同时清掉这个工程的本地场景数据，删空后会自动补一个新工程。",
+  },
+] as const;
 
-  const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
-  if (diffMinutes < 1) return "刚刚更新";
-  if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
-  if (diffMinutes < 1440) return `${Math.round(diffMinutes / 60)} 小时前`;
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-}
-
-/** 场景持久化键前缀（与 directorStore 保持一致）。 */
-const DIRECTOR_SCENE_STORAGE_KEY_PREFIX = "storyai-3d-director-desk-demo:";
-
-function readDeskProject(deskId: string) {
-  for (const key of [`${DIRECTOR_SCENE_STORAGE_KEY_PREFIX}${deskId}`, "storyai-3d-director-desk-demo"]) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as { project?: unknown };
-      if (isDirectorProjectShape(parsed?.project)) return parsed.project;
-    } catch {
-      // 单键损坏不影响其余
-    }
-  }
-  return null;
-}
-
-function downloadJson(text: string, fileName: string) {
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-export default function DirectorPage() {
+/** 帮助文档页：原首页的使用说明内容；工程管理等功能已内嵌到导演台编辑器的「工程目录」中。 */
+export default function DirectorHelpPage() {
   const navigate = useNavigate();
   const theme = useThemeStore((state) => state.theme);
-  const [records, setRecords] = useState(() => ensureDirectorDeskRecords());
-  // AI 桥（director-mcp，17372）在线状态：null = 探测中
+  // AI 桥（director-mcp）在线状态：null = 探测中
   const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -160,280 +134,181 @@ export default function DirectorPage() {
     probeDirectorBridge().then((status) => {
       if (alive) setBridgeOnline(status.online);
     });
-    const timer = window.setInterval(() => {
-      probeDirectorBridge().then((status) => {
-        if (alive) setBridgeOnline(status.online);
-      });
-    }, 10_000);
     return () => {
       alive = false;
-      window.clearInterval(timer);
     };
   }, []);
 
-  // 兼容旧链接：/director?instanceId=… 与性能基准参数一律进入全屏编辑器页
-  const urlInstanceId = new URLSearchParams(window.location.search).get("instanceId")?.trim() || null;
-  const benchmarkMode = getPerformanceBenchmarkMode(window.location.search);
-  useEffect(() => {
-    if (urlInstanceId || benchmarkMode) {
-      navigate({ pathname: "/director/editor", search: window.location.search }, { replace: true });
-    }
-  }, [benchmarkMode, navigate, urlInstanceId]);
-
-  if (urlInstanceId || benchmarkMode) return null;
-
-  const activeDeskId = readActiveDirectorDeskId() ?? records[0]?.id ?? "";
-
-  function openDirectorDesk(id: string) {
-    if (!id) return;
-    const ensured = ensureDirectorDeskRecordForId(records, id);
-    const nextRecords = touchDirectorDeskRecord(ensured.records, id);
-    setRecords(nextRecords);
-    writeActiveDirectorDeskId(id);
-    navigate({ pathname: "/director/editor", search: `?instanceId=${encodeURIComponent(id)}` });
-  }
-
-  function handleCreateDesk() {
-    const record = createDirectorDeskRecord(records);
-    const nextRecords = [...records, record];
-    writeDirectorDeskRecords(nextRecords);
-    setRecords(nextRecords);
-    writeActiveDirectorDeskId(record.id);
-    navigate({ pathname: "/director/editor", search: `?instanceId=${encodeURIComponent(record.id)}` });
-  }
-
-  function handleExportDesk(desk: DirectorDeskRecord) {
-    const project = readDeskProject(desk.id);
-    if (!project) {
-      window.alert(`「${desk.name}」还没有可导出的场景数据`);
-      return;
-    }
-    downloadJson(serializeProject(project), `${desk.name || "导演台"}.director-project.json`);
-  }
-
-  function handleImportProjectFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
-    void file.text().then((text) => {
-      try {
-        const project = parseProject(text);
-        const record = createDirectorDeskRecord(records, file.name.replace(/\.director-project\.json$|\.json$/i, ""));
-        const nextRecords = [...records, record];
-        writeDirectorDeskRecords(nextRecords);
-        setRecords(nextRecords);
-        writeActiveDirectorDeskId(record.id);
-        localStorage.setItem(`storyai-3d-director-desk-demo:${record.id}`, JSON.stringify({ project }));
-      } catch {
-        window.alert("工程文件解析失败：请确认是导演台导出的 .json 工程");
-      }
-    });
-  }
-
-  function handleDeleteDesk(desk: DirectorDeskRecord) {
-    if (!window.confirm(`删除「${desk.name}」？这个导演台里的本地场景也会一起删除。`)) return;
-
-    const result = deleteDirectorDeskRecord(records, desk.id);
-    setRecords(result.records);
-  }
-
   return (
-    <div className="director-desk-app" data-theme={theme === "dark" ? "dark" : "light"}>
-      <main className="director-home-shell">
-        <section className="director-home-hero">
-          <div>
-            <p className="director-home-kicker">Standalone 3D Director Desk</p>
-            <h1>选择一个导演台开始摆场景</h1>
-            <p>
-              每个导演台独立保存，重启后先回到这里选择，不会再直接打开上一次的无名工程。
-            </p>
-            <span
-              title={bridgeOnline ? "AI 桥（director-mcp）在线，DeepSeek 可以驱动导演台" : "AI 桥未启动：纯前端功能不受影响；要接 AI 编排请运行 start.bat"}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 12,
-                fontSize: 13,
-                padding: "3px 10px",
-                borderRadius: 999,
-                border: `1px solid ${bridgeOnline ? "#16a34a55" : "#9ca3af44"}`,
-                color: bridgeOnline ? "#16a34a" : "#9ca3af",
-                userSelect: "none",
-              }}
-            >
-              <Sparkles aria-hidden="true" size={13} />
-              {bridgeOnline === null ? "AI 桥检测中…" : bridgeOnline ? "AI 桥在线" : "AI 桥离线"}
-            </span>
-          </div>
-          <div className="director-home-hero-actions">
-            <button className="director-home-primary-button" type="button" onClick={handleCreateDesk}>
-              <Plus aria-hidden="true" size={18} />
-              新建导演台
-            </button>
-            <label className="director-home-scroll-hint" role="button" tabIndex={0} aria-label="导入工程文件">
-              <Upload aria-hidden="true" size={14} />
-              导入工程
-              <input type="file" accept="application/json,.json" className="hidden" onChange={handleImportProjectFile} />
-            </label>
-            <a className="director-home-scroll-hint" href="#director-home-guide-title">
-              向下查看使用说明
-              <ArrowDown aria-hidden="true" size={14} />
-            </a>
-          </div>
-        </section>
-
-        {records.length ? (
-          <section className="director-home-grid" aria-label="导演台列表">
-            {records.map((desk, index) => (
-              <article
-                key={desk.id}
-                className={`director-home-card ${desk.id === activeDeskId ? "is-active" : ""}`}
+    <div className="h-dvh overflow-hidden">
+      <div className="director-desk-app h-full" data-theme={theme === "dark" ? "dark" : "light"}>
+        <main className="director-home-shell">
+          <section className="director-home-hero">
+            <div>
+              <p className="director-home-kicker">3D Director Desk · Help</p>
+              <h1>3D 导演台帮助文档</h1>
+              <p>
+                打开网站即直接进入导演台编辑器；新建、导入、导出、删除工程都在编辑器顶栏的「工程目录」里完成。
+                本页只保留使用说明，供随时查阅。
+              </p>
+              <span
+                title={bridgeOnline ? "AI 桥（director-mcp）在线，DeepSeek 可以驱动导演台" : "AI 桥未启动：纯前端功能不受影响；要接 AI 编排请运行 start.bat"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 12,
+                  fontSize: 13,
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  border: `1px solid ${bridgeOnline ? "#16a34a55" : "#9ca3af44"}`,
+                  color: bridgeOnline ? "#16a34a" : "#9ca3af",
+                  userSelect: "none",
+                }}
               >
-                <button className="director-home-card-main" type="button" onClick={() => openDirectorDesk(desk.id)}>
-                  <span className="director-home-card-icon">
-                    <Boxes aria-hidden="true" size={22} strokeWidth={1.8} />
-                  </span>
-                  <span className="director-home-card-content">
-                    <span className="director-home-card-title">{desk.name}</span>
-                    <span className="director-home-card-meta">
-                      <Clock3 aria-hidden="true" size={13} />
-                      {formatDirectorDeskUpdatedAt(desk.updatedAt)}
-                    </span>
-                  </span>
-                  <span className="director-home-card-index">{String(index + 1).padStart(2, "0")}</span>
-                  <ArrowRight className="director-home-card-arrow" aria-hidden="true" size={18} />
-                </button>
-                <div className="director-home-card-actions">
-                  <button
-                    className="director-home-card-delete"
-                    type="button"
-                    aria-label={`删除${desk.name}`}
-                    onClick={() => handleDeleteDesk(desk)}
-                  >
-                    <Trash2 aria-hidden="true" size={15} strokeWidth={1.9} />
-                  </button>
-                  <button
-                    className="director-home-card-export"
-                    type="button"
-                    aria-label={`导出${desk.name}`}
-                    title="导出工程文件"
-                    onClick={() => handleExportDesk(desk)}
-                  >
-                    <Download aria-hidden="true" size={15} strokeWidth={1.9} />
-                  </button>
-                </div>
-              </article>
-            ))}
+                <Sparkles aria-hidden="true" size={13} />
+                {bridgeOnline === null ? "AI 桥检测中…" : bridgeOnline ? "AI 桥在线" : "AI 桥离线"}
+              </span>
+            </div>
+            <div className="director-home-hero-actions">
+              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
+                <ArrowRight aria-hidden="true" size={18} />
+                打开导演台
+              </button>
+              <a className="director-home-scroll-hint" href="#director-home-guide-title">
+                向下查看使用说明
+                <ArrowDownToLine aria-hidden="true" size={14} />
+              </a>
+            </div>
           </section>
-        ) : (
-          <section className="director-home-empty" aria-label="空导演台列表">
-            <Boxes aria-hidden="true" size={28} strokeWidth={1.6} />
-            <h2>还没有导演台</h2>
-            <p>点击“新建导演台”创建一个干净的 3D 场景。</p>
-          </section>
-        )}
 
-        <section className="director-home-guide" aria-labelledby="director-home-guide-title">
-          <header className="director-home-section-heading">
-            <span><BookOpen aria-hidden="true" size={16} />第一次使用</span>
-            <div>
-              <h2 id="director-home-guide-title">四步完成第一条运镜</h2>
-              <p>不用先学习复杂的 3D 软件，按照下面顺序操作即可。</p>
-            </div>
-          </header>
-          <ol className="director-home-steps">
-            {HOME_QUICK_START_STEPS.map(([title, description], index) => (
-              <li key={title}>
-                <span>{index + 1}</span>
-                <div><strong>{title}</strong><p>{description}</p></div>
-              </li>
-            ))}
-          </ol>
-          <p className="director-home-shortcuts">
-            <strong>掌镜快捷键</strong>
-            <kbd>WASD</kbd>移动
-            <kbd>Q / E</kbd>下降 / 上升
-            <kbd>Enter</kbd>保存镜头
-            <kbd>Space</kbd>播放 / 暂停
-            <kbd>Esc</kbd>退出掌镜
-          </p>
-        </section>
-
-        <section className="director-home-release" aria-labelledby="director-home-release-title">
-          <header className="director-home-section-heading">
-            <span><Sparkles aria-hidden="true" size={16} />本次更新</span>
-            <div>
-              <h2 id="director-home-release-title">路线编辑、监看与导出升级</h2>
-              <p>这次重点补全人物运动、镜头预演和参考视频工作流。</p>
-            </div>
-          </header>
-          <ul className="director-home-release-list">
-            {HOME_RELEASE_NOTES.map((note) => (
-              <li key={note}><Check aria-hidden="true" size={15} /><span>{note}</span></li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="director-home-contributors" aria-labelledby="director-home-contributors-title">
-          <header className="director-home-section-heading">
-            <span><Users aria-hidden="true" size={16} />群友贡献</span>
-            <div>
-              <h2 id="director-home-contributors-title">共同完善 3D 导演台</h2>
-              <p>感谢群友提供真实工作流、镜头构想和使用反馈。</p>
-            </div>
-          </header>
-          <dl className="director-home-contributor-list">
-            {HOME_COMMUNITY_CONTRIBUTORS.map((contributor) => (
-              <div key={contributor.douyinId}>
-                <dt>{contributor.name}</dt>
-                <dd><span>{contributor.contribution}</span><strong>抖音号：{contributor.douyinId}</strong></dd>
+          <section className="director-home-guide" aria-labelledby="director-home-guide-title">
+            <header className="director-home-section-heading">
+              <span><BookOpen aria-hidden="true" size={16} />第一次使用</span>
+              <div>
+                <h2 id="director-home-guide-title">四步完成第一条运镜</h2>
+                <p>不用先学习复杂的 3D 软件，按照下面顺序操作即可。</p>
               </div>
-            ))}
-          </dl>
-        </section>
+            </header>
+            <ol className="director-home-steps">
+              {HOME_QUICK_START_STEPS.map(([title, description], index) => (
+                <li key={title}>
+                  <span>{index + 1}</span>
+                  <div><strong>{title}</strong><p>{description}</p></div>
+                </li>
+              ))}
+            </ol>
+            <p className="director-home-shortcuts">
+              <strong>掌镜快捷键</strong>
+              <kbd>WASD</kbd>移动
+              <kbd>Q / E</kbd>下降 / 上升
+              <kbd>Enter</kbd>保存镜头
+              <kbd>Space</kbd>播放 / 暂停
+              <kbd>Esc</kbd>退出掌镜
+            </p>
+          </section>
 
-        <section className="director-home-controls" aria-labelledby="director-home-controls-title">
-          <header className="director-home-section-heading">
-            <span><Keyboard aria-hidden="true" size={16} />完整操作表</span>
-            <div>
-              <h2 id="director-home-controls-title">键盘、鼠标与触控板操作</h2>
-              <p>快捷键在输入框中不会触发；掌镜模式下请先单击 3D 画面锁定鼠标。</p>
+          <section className="director-home-guide" aria-labelledby="director-home-project-title">
+            <header className="director-home-section-heading">
+              <span><FolderOpen aria-hidden="true" size={16} />工程管理</span>
+              <div>
+                <h2 id="director-home-project-title">工程目录：编号、名称与本地存储</h2>
+                <p>工程按「编号 + 名称」管理，全部数据保存在本机浏览器，入口在编辑器顶栏左侧的文件夹图标。</p>
+              </div>
+            </header>
+            <div className="director-home-control-grid">
+              {HOME_PROJECT_MANAGEMENT.map((item) => (
+                <article key={item.title} className="director-home-control-group">
+                  <header><item.icon aria-hidden="true" size={15} /><div><h3>{item.title}</h3><p>{item.description}</p></div></header>
+                </article>
+              ))}
             </div>
-          </header>
+            <article className="director-home-mac-gestures">
+              <header><HardDrive aria-hidden="true" size={17} /><div><h3>数据保存在哪里</h3><p>本地存储与外部接入说明</p></div></header>
+              <dl>
+                <div><dt>本地存储</dt><dd>工程列表与每个场景保存在浏览器 localStorage，并镜像到 IndexedDB，换端口或浏览器异常后可自动找回。</dd></div>
+                <div><dt>编号规则</dt><dd>新建工程自动分配递增编号（#01、#02…），默认名称“导演台 N 号”；重命名不影响编号。</dd></div>
+                <div><dt>按编号或名称打开</dt><dd>URL 参数 instanceId 支持编号、desk_N 或工程名，例如 /?instanceId=2、/?instanceId=我的场景，便于外部系统直接打开指定工程。</dd></div>
+                <div><dt>AI / 外部接入</dt><dd>Agent 通过 director-desk MCP 工具驱动当前工程；用上面的 URL 方式即可让外部流程定位到指定工程。</dd></div>
+              </dl>
+            </article>
+          </section>
 
-          <div className="director-home-control-grid">
-            {HOME_CONTROL_GROUPS.map((group) => (
-              <article key={group.title} className="director-home-control-group">
-                <header><MousePointer2 aria-hidden="true" size={15} /><div><h3>{group.title}</h3><p>{group.description}</p></div></header>
-                <dl>
-                  {group.controls.map(([keys, action]) => (
-                    <div key={keys}><dt>{keys}</dt><dd>{action}</dd></div>
-                  ))}
-                </dl>
-              </article>
-            ))}
-          </div>
+          <section className="director-home-controls" aria-labelledby="director-home-controls-title">
+            <header className="director-home-section-heading">
+              <span><Keyboard aria-hidden="true" size={16} />完整操作表</span>
+              <div>
+                <h2 id="director-home-controls-title">键盘、鼠标与触控板操作</h2>
+                <p>快捷键在输入框中不会触发；掌镜模式下请先单击 3D 画面锁定鼠标。</p>
+              </div>
+            </header>
 
-          <article className="director-home-mac-gestures">
-            <header><Hand aria-hidden="true" size={17} /><div><h3>macOS 触控板手势</h3><p>以 MacBook 默认手势和已开启“辅助点按”为准</p></div></header>
-            <dl>
-              {HOME_MAC_GESTURES.map(([gesture, action]) => (
-                <div key={gesture}><dt>{gesture}</dt><dd>{action}</dd></div>
+            <div className="director-home-control-grid">
+              {HOME_CONTROL_GROUPS.map((group) => (
+                <article key={group.title} className="director-home-control-group">
+                  <header><MousePointer2 aria-hidden="true" size={15} /><div><h3>{group.title}</h3><p>{group.description}</p></div></header>
+                  <dl>
+                    {group.controls.map(([keys, action]) => (
+                      <div key={keys}><dt>{keys}</dt><dd>{action}</dd></div>
+                    ))}
+                  </dl>
+                </article>
+              ))}
+            </div>
+
+            <article className="director-home-mac-gestures">
+              <header><Hand aria-hidden="true" size={17} /><div><h3>macOS 触控板手势</h3><p>以 MacBook 默认手势和已开启“辅助点按”为准</p></div></header>
+              <dl>
+                {HOME_MAC_GESTURES.map(([gesture, action]) => (
+                  <div key={gesture}><dt>{gesture}</dt><dd>{action}</dd></div>
+                ))}
+              </dl>
+            </article>
+
+            <article className="director-home-tools-guide">
+              <h3>主要界面按钮</h3>
+              <dl>
+                {HOME_TOOL_GROUPS.map(([area, actions]) => (
+                  <div key={area}><dt>{area}</dt><dd>{actions}</dd></div>
+                ))}
+              </dl>
+            </article>
+          </section>
+
+          <section className="director-home-release" aria-labelledby="director-home-release-title">
+            <header className="director-home-section-heading">
+              <span><Sparkles aria-hidden="true" size={16} />本次更新</span>
+              <div>
+                <h2 id="director-home-release-title">路线编辑、监看与导出升级</h2>
+                <p>这次重点补全人物运动、镜头预演和参考视频工作流。</p>
+              </div>
+            </header>
+            <ul className="director-home-release-list">
+              {HOME_RELEASE_NOTES.map((note) => (
+                <li key={note}><Check aria-hidden="true" size={15} /><span>{note}</span></li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="director-home-contributors" aria-labelledby="director-home-contributors-title">
+            <header className="director-home-section-heading">
+              <span><Users aria-hidden="true" size={16} />群友贡献</span>
+              <div>
+                <h2 id="director-home-contributors-title">共同完善 3D 导演台</h2>
+                <p>感谢群友提供真实工作流、镜头构想和使用反馈。</p>
+              </div>
+            </header>
+            <dl className="director-home-contributor-list">
+              {HOME_COMMUNITY_CONTRIBUTORS.map((contributor) => (
+                <div key={contributor.douyinId}>
+                  <dt>{contributor.name}</dt>
+                  <dd><span>{contributor.contribution}</span><strong>抖音号：{contributor.douyinId}</strong></dd>
+                </div>
               ))}
             </dl>
-          </article>
-
-          <article className="director-home-tools-guide">
-            <h3>主要界面按钮</h3>
-            <dl>
-              {HOME_TOOL_GROUPS.map(([area, actions]) => (
-                <div key={area}><dt>{area}</dt><dd>{actions}</dd></div>
-              ))}
-            </dl>
-          </article>
-        </section>
-      </main>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

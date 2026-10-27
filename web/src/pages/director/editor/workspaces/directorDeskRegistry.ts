@@ -248,3 +248,31 @@ export function deleteDirectorDeskRecord(records: DirectorDeskRecord[], id: stri
     activeId: nextActiveId,
   };
 }
+
+/** 导演台编号：desk_N → N；非编号 id（旧数据/外部 id）返回 0。 */
+export function getDirectorDeskNumber(desk: DirectorDeskRecord) {
+  const match = desk.id.match(/^desk_(\d+)$/);
+  return match ? Number(match[1]) : 0;
+}
+
+/**
+ * 外部引用 → desk id：支持纯编号（2）、desk_N、导演台名称（含「导演台02号」等变体）。
+ * 无法解析时原样返回，交给 ensureDirectorDeskRecordForId 兜底创建。
+ */
+export function normalizeDirectorDeskRef(records: DirectorDeskRecord[], ref: string) {
+  const trimmed = ref.trim();
+  if (!trimmed) return trimmed;
+  if (records.some((desk) => desk.id === trimmed)) return trimmed;
+
+  const numeric = Number(trimmed);
+  if (Number.isInteger(numeric) && numeric > 0) {
+    const byNumber = records.find((desk) => getDirectorDeskNumber(desk) === numeric);
+    return byNumber?.id ?? `${DIRECTOR_DESK_ID_PREFIX}${numeric}`;
+  }
+
+  const normalizedRef = normalizeDirectorDeskName(trimmed);
+  const byName = records.find((desk) => desk.name === normalizedRef);
+  if (byName) return byName.id;
+
+  return trimmed;
+}

@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Route, Settings2 } from "lucide-react";
+import { BookOpen, FolderOpen, Route, Settings2 } from "lucide-react";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { useConfigStore } from "@/stores/use-config-store";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
@@ -9,6 +9,7 @@ import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
 import { ExportPanel } from "./editor/panels/ExportPanel";
 import { CanvasImportPanel } from "./editor/panels/CanvasImportPanel";
+import { ProjectDirectoryPanel } from "./editor/panels/ProjectDirectoryPanel";
 import { DirectorAgentChatPanel, DirectorAgentChatToggle } from "./editor/agent/DirectorAgentChatPanel";
 import {
   clearDirectorDeskHostBridge,
@@ -22,6 +23,7 @@ import {
   ensureDirectorDeskRecordForId,
   ensureDirectorDeskRecords,
   getInitialDirectorDeskId,
+  normalizeDirectorDeskRef,
   touchDirectorDeskRecord,
   writeActiveDirectorDeskId,
   writeDirectorDeskRecords,
@@ -55,7 +57,10 @@ function createInitialEditorViewState(urlInstanceId: string | null) {
   }
   return {
     records,
-    activeDeskId: urlInstanceId ?? getInitialDirectorDeskId(records) ?? records[0]?.id ?? "",
+    // instanceId 支持编号（2）、desk_N、工程名等外部引用，统一解析成 desk id
+    activeDeskId: urlInstanceId
+      ? normalizeDirectorDeskRef(records, urlInstanceId)
+      : (getInitialDirectorDeskId(records) ?? records[0]?.id ?? ""),
   };
 }
 
@@ -115,15 +120,16 @@ export default function DirectorEditorPage() {
   })();
   const [directorDeskView, setDirectorDeskView] = useState(() => createInitialEditorViewState(urlInstanceId));
   const { records: directorDesks, activeDeskId } = directorDeskView;
+  const [projectDirectoryOpen, setProjectDirectoryOpen] = useState(false);
   const viewMode = useDirectorStore((state) => state.viewMode);
   const setViewMode = useDirectorStore((state) => state.setViewMode);
   const motionStudioOpen = useDirectorStore((state) => state.motionStudioOpen);
   const setMotionStudioOpen = useDirectorStore((state) => state.setMotionStudioOpen);
 
-  // 场景加载：首次进入、顶栏切换导演台、浏览器前进后退都经由 URL 参数驱动
+  // 场景加载：首次进入、工程目录切换、浏览器前进后退都经由 URL 参数驱动
   useEffect(() => {
     if (benchmarkMode) return;
-    const id = urlInstanceId ?? activeDeskId ?? "";
+    const id = urlInstanceId ? normalizeDirectorDeskRef(directorDesks, urlInstanceId) : (activeDeskId ?? "");
     if (!id) return;
     if (urlInstanceId !== id) {
       const nextParams = new URLSearchParams(searchParams);
@@ -202,8 +208,12 @@ export default function DirectorEditorPage() {
     };
   }, []);
 
-  function backToHome() {
-    navigate("/director");
+  /** 打开（切换）工程：写入 instanceId 参数，场景加载 effect 会据此重载场景。 */
+  function openDirectorDesk(id: string) {
+    if (!id) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("instanceId", id);
+    setSearchParams(nextParams);
   }
 
   return (
@@ -212,11 +222,22 @@ export default function DirectorEditorPage() {
       <div className="director-desk-app" data-theme="dark">
         <DirectorAgentChatPanel />
       <AppConfigModal />
+      <ProjectDirectoryPanel
+        open={projectDirectoryOpen}
+        onClose={() => setProjectDirectoryOpen(false)}
+        records={directorDesks}
+        activeDeskId={activeDeskId}
+        onRecordsChange={(records) => setDirectorDeskView({ records, activeDeskId })}
+        onOpenDesk={openDirectorDesk}
+      />
         <div className="app-shell">
           <header className="top-bar">
             <div className="top-bar-left">
-              <button className="top-bar-exit-button" type="button" title="退出导演台" aria-label="退出导演台" onClick={backToHome}>
-                <ArrowLeft aria-hidden="true" size={15} />
+              <button className="top-bar-icon-button" type="button" title="工程目录（新建 / 导入 / 删除 / 切换）" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
+                <FolderOpen aria-hidden="true" size={15} />
+              </button>
+              <button className="top-bar-icon-button" type="button" title="帮助文档" aria-label="打开帮助文档" onClick={() => navigate("/help")}>
+                <BookOpen aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField
                 desks={directorDesks}
