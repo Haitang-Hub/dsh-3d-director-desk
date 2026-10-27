@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, ChevronDown, ChevronRight, ChevronUp, Eraser, Magnet, SlidersHorizontal, X } from "lucide-react";
+import { ArrowUp, Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Eraser, ImagePlus, Magnet, SlidersHorizontal, X, XCircle } from "lucide-react";
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
 import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirectorAgentChat";
 
-/** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置与外观持久化。 */
-type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean; glassAlpha: number; compact: boolean };
+/** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置、宽度与外观持久化；悬浮态宽高可自由调整。 */
+type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean; glassAlpha: number; width: number; floatW: number; floatH: number };
 
 const LAYOUT_STORAGE_KEY = "director-agent-panel-layout-v1";
 const DOCK_SNAP_DISTANCE = 56;
 const FLOAT_WIDTH = 344;
+const FLOAT_MIN_W = 320;
+const FLOAT_MIN_H = 360;
+const DOCK_MIN_WIDTH = 280;
+const DOCK_MAX_WIDTH = 640;
 
 function loadLayout(): PanelLayout {
     try {
@@ -23,15 +27,18 @@ function loadLayout(): PanelLayout {
                     x: Number(parsed.x) || 80,
                     y: Number(parsed.y) || 80,
                     collapsed: Boolean(parsed.collapsed),
-                    glassAlpha: typeof parsed.glassAlpha === "number" ? Math.min(0.92, Math.max(0.3, parsed.glassAlpha)) : 0.68,
-                    compact: Boolean(parsed.compact),
+                    glassAlpha: typeof parsed.glassAlpha === "number" ? Math.min(1, Math.max(0.2, parsed.glassAlpha)) : 0.68,
+                    width: Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, Number(parsed.width) || 380)),
+                    // 悬浮态自由尺寸：夹取回当前视口，避免历史值落在屏幕外。
+                    floatW: Math.min(Math.max(FLOAT_MIN_W, Number(parsed.floatW) || FLOAT_WIDTH), Math.max(FLOAT_MIN_W, window.innerWidth - 16)),
+                    floatH: Math.min(Math.max(FLOAT_MIN_H, Number(parsed.floatH) || Math.min(window.innerHeight * 0.72, 680)), Math.max(FLOAT_MIN_H, window.innerHeight - 16)),
                 };
             }
         }
     } catch {
         // 布局损坏时用默认值
     }
-    return { mode: "right", x: 0, y: 0, collapsed: false, glassAlpha: 0.68, compact: false };
+    return { mode: "right", x: 0, y: 0, collapsed: false, glassAlpha: 0.68, width: 380, floatW: FLOAT_WIDTH, floatH: Math.min(window.innerHeight * 0.72, 680) };
 }
 
 function saveLayout(layout: PanelLayout) {
@@ -42,8 +49,7 @@ function saveLayout(layout: PanelLayout) {
     }
 }
 
-/** 渲染一步幕后执行记录。 */
-function StepItem({ step }: { step: AgentStep }) {
+/** 渲染一步幕后执行记录。 */function StepItem({ step }: { step: AgentStep }) {
     if (step.kind === "narration") {
         return <div className="director-agent-process-narration">{step.text}</div>;
     }
@@ -53,35 +59,65 @@ function StepItem({ step }: { step: AgentStep }) {
     return <div className="director-agent-process-narration is-note">{step.text}</div>;
 }
 
-/** 渲染一行工具执行记录（默认折叠为单行 chip，点击展开）。 */
+/** 渲染一行工具执行记录：状态卡片（对勾/叉 + 工具名 + 完成状态），点击展开结果摘要。 */
 function ToolChip({ name, summary, failed }: { name?: string; summary?: string; failed?: boolean }) {
     const [expanded, setExpanded] = useState(false);
     if (!name) return null;
     return (
-        <button
-            type="button"
-            className={`director-agent-panel-tool${failed ? " is-error" : ""}${expanded ? " is-expanded" : ""}`}
-            onClick={() => setExpanded((value) => !value)}
-            title={summary}
-        >
-            {expanded ? summary : `⚙ ${name} · ${summary?.slice(0, 90) || "已执行"}`}
-        </button>
+        <div className={`director-agent-panel-tool${failed ? " is-error" : ""}${expanded ? " is-expanded" : ""}`}>
+            <button type="button" className="director-agent-tool-row" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+                {failed ? <XCircle aria-hidden="true" size={15} className="director-agent-tool-icon" /> : <CheckCircle2 aria-hidden="true" size={15} className="director-agent-tool-icon" />}
+                <span className="director-agent-tool-label">
+                    调用工具：<strong>{name}</strong>
+                </span>
+                <span className={`director-agent-tool-status${failed ? " is-failed" : ""}`}>{failed ? "失败" : "已完成"}</span>
+            </button>
+            {expanded && summary ? <div className="director-agent-tool-summary">{summary}</div> : null}
+        </div>
     );
 }
 
+/** 结论文本渲染：**加粗** 转为粗体、去掉反引号，其余原样保留。 */
+function ConclusionText({ text }: { text: string }) {
+    const cleaned = text.replace(/`([^`]+)`/g, "$1");
+    const parts = cleaned.split(/\*\*(.+?)\*\*/g);
+    return (
+        <>
+            {parts.map((part, index) => (index % 2 === 1 ? <strong key={index}>{part}</strong> : <span key={index}>{part}</span>))}
+        </>
+    );
+}
+
+/** 单条消息最多附带的图片数量与单文件大小上限。 */
+const ATTACHMENT_LIMIT = 4;
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** 结论兜底清洗：模型偶尔仍输出的 markdown 修饰符（`代码`）转成纯文本；加粗交给 ConclusionText 渲染。 */
+
 /**
- * 一轮任务的展示：用户目标气泡 → 运行中进度卡 → 最终结论；
- * 推理叙述/工具调用/报错重试收进「执行过程」折叠区，按需展开。
+ * 一轮任务的展示（按时间顺序）：用户气泡 → 进度/执行步骤（运行中实时展开）→ 最终结论。
+ * 运行中步骤始终展开，用户能看到正在做什么；结束后收进「执行过程」折叠区，结论保持在最后。
  */
 function TurnView({ turn }: { turn: AgentTurn }) {
     const [expanded, setExpanded] = useState(false);
     const toolCount = turn.steps.filter((step) => step.kind === "tool").length;
+    const running = turn.status === "running";
+    const showSteps = running || expanded;
 
     return (
         <>
-            <div className="director-agent-panel-bubble is-user">{turn.goal}</div>
+            <div className="director-agent-panel-bubble is-user">
+                {turn.images.length ? (
+                    <div className="director-agent-bubble-images">
+                        {turn.images.map((url, index) => (
+                            <img key={index} src={url} alt={`附件 ${index + 1}`} className="director-agent-bubble-image" />
+                        ))}
+                    </div>
+                ) : null}
+                {turn.goal}
+            </div>
 
-            {turn.status === "running" ? (
+            {running ? (
                 <div className="director-agent-progress" role="status">
                     <span className="director-agent-progress-spinner" aria-hidden="true" />
                     <div className="director-agent-progress-main">
@@ -91,21 +127,19 @@ function TurnView({ turn }: { turn: AgentTurn }) {
                 </div>
             ) : null}
 
-            {turn.status === "done" && turn.conclusion ? (
-                <div className="director-agent-panel-bubble is-assistant director-agent-conclusion">{turn.conclusion}</div>
-            ) : null}
-
-            {turn.status === "failed" ? (
-                <div className="director-agent-panel-bubble is-error">{turn.error || "任务执行失败。"}</div>
-            ) : null}
-
-            {turn.steps.length > 0 && turn.status !== "running" ? (
+            {turn.steps.length > 0 ? (
                 <div className="director-agent-process">
-                    <button type="button" className="director-agent-process-toggle" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
-                        <ChevronRight aria-hidden="true" size={12} className={expanded ? "is-open" : ""} />
-                        执行过程 · {turn.steps.length} 步{toolCount ? `（工具 ${toolCount}）` : ""}
+                    <button
+                        type="button"
+                        className="director-agent-process-toggle"
+                        onClick={() => !running && setExpanded((value) => !value)}
+                        aria-expanded={showSteps}
+                        disabled={running}
+                    >
+                        <ChevronRight aria-hidden="true" size={12} className={showSteps ? "is-open" : ""} />
+                        {running ? "正在执行" : "执行过程"} · {turn.steps.length} 步{toolCount ? `（工具 ${toolCount}）` : ""}
                     </button>
-                    {expanded ? (
+                    {showSteps ? (
                         <div className="director-agent-process-body">
                             {turn.steps.map((step) => (
                                 <StepItem key={step.id} step={step} />
@@ -113,6 +147,27 @@ function TurnView({ turn }: { turn: AgentTurn }) {
                         </div>
                     ) : null}
                 </div>
+            ) : null}
+
+            {turn.previews.length ? (
+                <div className="director-agent-previews">
+                    {turn.previews.map((url, index) => (
+                        <figure key={index} className="director-agent-preview">
+                            <img src={url} alt={`预览截图 ${index + 1}`} onClick={() => window.open(url)} />
+                            <figcaption>预览截图 · 点击放大</figcaption>
+                        </figure>
+                    ))}
+                </div>
+            ) : null}
+
+            {turn.status === "done" && turn.conclusion ? (
+                <div className="director-agent-panel-bubble is-assistant director-agent-conclusion">
+                    <ConclusionText text={turn.conclusion} />
+                </div>
+            ) : null}
+
+            {turn.status === "failed" ? (
+                <div className="director-agent-panel-bubble is-error">{turn.error || "任务执行失败。"}</div>
             ) : null}
         </>
     );
@@ -169,7 +224,6 @@ function AgentModelRow() {
                 aria-label="选择模型"
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                title="AI 助手使用的对话模型"
                 onClick={() => setOpen((value) => !value)}
             >
                 <span className="director-agent-model-label">{selectedLabel || "未配置模型"}</span>
@@ -214,11 +268,16 @@ export function DirectorAgentChatPanel() {
     const [layout, setLayout] = useState<PanelLayout>(loadLayout);
     const [dragging, setDragging] = useState(false);
     const [draft, setDraft] = useState("");
+    const [attachments, setAttachments] = useState<string[]>([]);
+    const [attachError, setAttachError] = useState("");
     const [showAppearance, setShowAppearance] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const appearanceRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+    const resizeRef = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null);
+    const floatResizeRef = useRef<{ pointerId: number; startX: number; startY: number; w: number; h: number } | null>(null);
     const panelRef = useRef<HTMLElement>(null);
 
     // 外观设置：点到弹层与触发按钮以外的地方自动收回（Esc 同样）
@@ -258,11 +317,10 @@ export function DirectorAgentChatPanel() {
     useEffect(() => {
         if (!open) return;
         setLayout((current) => {
-            if (current.mode !== "float") return current;
-            // 面板高度是 min(72vh, 680px)，钳制 top 使整个面板落在视口内
-            const panelHeight = Math.min(window.innerHeight * 0.72, 680);
-            const x = Math.min(Math.max(current.x, 8), Math.max(8, window.innerWidth - FLOAT_WIDTH - 8));
-            const y = Math.min(Math.max(current.y, 8), Math.max(8, window.innerHeight - panelHeight - 8));
+        if (current.mode !== "float") return current;
+        // 面板高度是持久化的 floatH，钳制位置使整个面板落在视口内
+        const x = Math.min(Math.max(current.x, 8), Math.max(8, window.innerWidth - current.floatW - 8));
+        const y = Math.min(Math.max(current.y, 8), Math.max(8, window.innerHeight - current.floatH - 8));
             if (x === current.x && y === current.y) return current;
             const next = { ...current, x, y };
             saveLayout(next);
@@ -315,7 +373,7 @@ export function DirectorAgentChatPanel() {
         setDragging(false);
         // 磁性吸附：接近左右边缘时停靠
         setLayout((current) => {
-            const right = left + FLOAT_WIDTH;
+            const right = left + current.floatW;
             let mode: PanelLayout["mode"];
             let x = 0;
             let y = 0;
@@ -325,8 +383,8 @@ export function DirectorAgentChatPanel() {
                 mode = "right";
             } else {
                 mode = "float";
-                x = Math.min(Math.max(left, 8), window.innerWidth - FLOAT_WIDTH - 8);
-                y = Math.min(Math.max(top, 8), window.innerHeight - 56);
+                x = Math.min(Math.max(left, 8), Math.max(8, window.innerWidth - current.floatW - 8));
+                y = Math.min(Math.max(top, 8), Math.max(8, window.innerHeight - current.floatH - 8));
             }
             const next = { ...current, mode, x, y };
             saveLayout(next);
@@ -334,29 +392,110 @@ export function DirectorAgentChatPanel() {
         });
     }
 
+    // 悬浮态右下角自由调宽高（取自无限画布面板）：夹取在视口内
+    function onFloatResizePointerDown(event: React.PointerEvent) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        floatResizeRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, w: layout.floatW, h: layout.floatH };
+        try {
+            (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+        } catch {
+            // 捕获不可用时仍能拖动
+        }
+    }
+
+    function onFloatResizePointerMove(event: React.PointerEvent) {
+        const resize = floatResizeRef.current;
+        if (!resize || resize.pointerId !== event.pointerId) return;
+        const width = Math.min(window.innerWidth - layout.x - 8, Math.max(FLOAT_MIN_W, resize.w + event.clientX - resize.startX));
+        const height = Math.min(window.innerHeight - layout.y - 8, Math.max(FLOAT_MIN_H, resize.h + event.clientY - resize.startY));
+        updateLayout({ floatW: Math.max(FLOAT_MIN_W, width), floatH: Math.max(FLOAT_MIN_H, height) });
+    }
+
+    function onFloatResizePointerUp(event: React.PointerEvent) {
+        if (floatResizeRef.current?.pointerId !== event.pointerId) return;
+        floatResizeRef.current = null;
+    }
+
+    // 停靠宽度拖动：右侧停靠时向左拖变宽，左侧停靠时向右拖变宽
+    function onResizePointerDown(event: React.PointerEvent) {
+        if (event.button !== 0) return;
+        resizeRef.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: layout.width };
+        try {
+            (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+        } catch {
+            // 捕获不可用时仍能拖动
+        }
+    }
+
+    function onResizePointerMove(event: React.PointerEvent) {
+        const resize = resizeRef.current;
+        if (!resize || resize.pointerId !== event.pointerId) return;
+        const delta = layout.mode === "right" ? resize.startX - event.clientX : event.clientX - resize.startX;
+        const width = Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, resize.startWidth + delta));
+        updateLayout({ width });
+    }
+
+    function onResizePointerUp(event: React.PointerEvent) {
+        if (resizeRef.current?.pointerId !== event.pointerId) return;
+        resizeRef.current = null;
+    }
+
+    // 选择本地图片并转为 data URL 附件（最多 4 张，单张 ≤10MB）
+    function onPickImages(event: React.ChangeEvent<HTMLInputElement>) {
+        const files = Array.from(event.target.files || []);
+        event.target.value = "";
+        if (!files.length) return;
+        setAttachError("");
+        const room = ATTACHMENT_LIMIT - attachments.length;
+        if (room <= 0) {
+            setAttachError(`最多附带 ${ATTACHMENT_LIMIT} 张图片。`);
+            return;
+        }
+        const accepted = files.slice(0, room);
+        if (files.length > room) setAttachError(`最多附带 ${ATTACHMENT_LIMIT} 张图片，已忽略多余的 ${files.length - room} 张。`);
+        for (const file of accepted) {
+            if (!file.type.startsWith("image/")) {
+                setAttachError(`「${file.name}」不是图片文件。`);
+                continue;
+            }
+            if (file.size > ATTACHMENT_MAX_BYTES) {
+                setAttachError(`「${file.name}」超过 10MB，已跳过。`);
+                continue;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (typeof reader.result === "string") setAttachments((current) => (current.length >= ATTACHMENT_LIMIT ? current : [...current, reader.result as string]));
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     function submit() {
         const text = draft.trim();
-        if (!text || sending) return;
+        if ((!text && !attachments.length) || sending) return;
+        const images = attachments;
         setDraft("");
-        void send(text);
+        setAttachments([]);
+        setAttachError("");
+        void send(text, images);
     }
 
     const docked = layout.mode !== "float";
-    const floatStyle = layout.mode === "float" ? { left: layout.x, top: layout.y } : undefined;
+    const floatStyle = layout.mode === "float" ? { left: layout.x, top: layout.y, width: layout.floatW, height: layout.collapsed ? undefined : layout.floatH } : undefined;
     const showBody = !layout.collapsed;
 
     return (
         <aside
             ref={panelRef}
-            className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""} ${layout.compact ? "is-compact" : ""}`}
+            className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""}`}
             data-dock={docked ? layout.mode : undefined}
-            style={{ ...(floatStyle || {}), "--director-agent-glass-alpha": layout.glassAlpha } as React.CSSProperties}
+            style={{ ...(floatStyle || {}), ...(docked ? { width: layout.width } : {}), "--director-agent-glass-alpha": layout.glassAlpha } as React.CSSProperties}
             role="dialog"
             aria-label="AI 助手"
         >
             <header
                 className="director-agent-panel-header"
-                title="拖动移动 · 靠近屏幕左右边缘自动吸附"
                 onPointerDown={onHeaderPointerDown}
                 onPointerMove={onHeaderPointerMove}
                 onPointerUp={onHeaderPointerUp}
@@ -366,19 +505,45 @@ export function DirectorAgentChatPanel() {
                     <Bot aria-hidden="true" size={15} className={docked ? "director-agent-panel-dock-hint" : ""} />
                     <span>AI 助手</span>
                 </span>
-                <button type="button" className="director-agent-panel-icon-button" aria-label={layout.collapsed ? "展开面板" : "折叠面板"} title={layout.collapsed ? "展开" : "折叠"} onClick={() => updateLayout({ collapsed: !layout.collapsed })}>
+                <button type="button" className="director-agent-panel-icon-button" aria-label={layout.collapsed ? "展开面板" : "折叠面板"} data-tip={layout.collapsed ? "展开" : "折叠"} onClick={() => updateLayout({ collapsed: !layout.collapsed })}>
                     {layout.collapsed ? <ChevronUp aria-hidden="true" size={14} /> : <ChevronDown aria-hidden="true" size={14} />}
                 </button>
-                <button type="button" className="director-agent-panel-icon-button" aria-label="切换停靠位置" title={docked ? "拖离边缘切换为自由浮动" : "拖到屏幕边缘吸附停靠"} onClick={() => updateLayout(docked ? { mode: "float", x: Math.max(60, window.innerWidth / 2 - FLOAT_WIDTH / 2), y: 90 } : { mode: "right" })}>
+                <button type="button" className="director-agent-panel-icon-button" aria-label="切换停靠位置" data-tip={docked ? "取消吸附" : "吸附"} onClick={() => updateLayout(docked ? { mode: "float", x: Math.max(60, window.innerWidth / 2 - FLOAT_WIDTH / 2), y: 90 } : { mode: "right" })}>
                     <Magnet aria-hidden="true" size={14} className={docked ? "director-agent-panel-dock-hint" : ""} />
                 </button>
-                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 AI 助手" title="关闭" onClick={() => setOpen(false)}>
+                <button type="button" className="director-agent-panel-icon-button" aria-label="关闭 AI 助手" data-tip="关闭" onClick={() => setOpen(false)}>
                     <X aria-hidden="true" size={15} />
                 </button>
             </header>
 
             {showBody ? (
                 <div className="director-agent-panel-body">
+                    {docked ? (
+                        <div
+                            className="director-agent-panel-resize"
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label="拖动调整面板宽度"
+                            data-tip="拖动调整宽度"
+                            onPointerDown={onResizePointerDown}
+                            onPointerMove={onResizePointerMove}
+                            onPointerUp={onResizePointerUp}
+                            onPointerCancel={onResizePointerUp}
+                        />
+                    ) : (
+                        <span
+                            className="director-agent-panel-float-resize"
+                            role="separator"
+                            aria-label="拖动调整面板大小"
+                            data-tip="拖动调整大小"
+                            onPointerDown={onFloatResizePointerDown}
+                            onPointerMove={onFloatResizePointerMove}
+                            onPointerUp={onFloatResizePointerUp}
+                            onPointerCancel={onFloatResizePointerUp}
+                        >
+                            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 6 6 14M14 11l-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                        </span>
+                    )}
                     <div ref={scrollRef} className="director-agent-panel-messages">
                         {turns.length === 0 ? (
                             <div className="director-agent-panel-hint">
@@ -395,6 +560,19 @@ export function DirectorAgentChatPanel() {
                         )}
                     </div>
                     <div className="director-agent-panel-composer">
+                        {attachments.length ? (
+                            <div className="director-agent-attachments">
+                                {attachments.map((url, index) => (
+                                    <span key={index} className="director-agent-attachment">
+                                        <img src={url} alt={`附件 ${index + 1}`} />
+                                        <button type="button" className="director-agent-attachment-remove" aria-label={`移除附件 ${index + 1}`} onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))}>
+                                            <X aria-hidden="true" size={11} />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+                        {attachError ? <div className="director-agent-attach-error">{attachError}</div> : null}
                         <textarea
                             ref={textareaRef}
                             className="director-agent-panel-input"
@@ -414,34 +592,44 @@ export function DirectorAgentChatPanel() {
                                 {showAppearance ? (
                                     <div ref={appearanceRef} className="director-agent-appearance" role="dialog" aria-label="助手外观设置">
                                         <div className="director-agent-appearance-block">
-                                            <div className="director-agent-appearance-label">毛玻璃透明度</div>
+                                            <div className="director-agent-appearance-label">
+                                                毛玻璃透明度
+                                                <span className="director-agent-appearance-value">{Math.round(layout.glassAlpha * 100)}%</span>
+                                            </div>
                                             <input
                                                 type="range"
-                                                min={30}
-                                                max={92}
+                                                min={20}
+                                                max={100}
                                                 value={Math.round(layout.glassAlpha * 100)}
                                                 onChange={(event) => updateLayout({ glassAlpha: Number(event.target.value) / 100 })}
                                             />
                                         </div>
-                                        <div className="director-agent-appearance-row">
-                                            <span className="director-agent-appearance-label">紧凑模式</span>
-                                            <input type="checkbox" checked={layout.compact} onChange={(event) => updateLayout({ compact: event.target.checked })} />
-                                        </div>
                                     </div>
                                 ) : null}
+                                <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={onPickImages} />
+                                <button
+                                    type="button"
+                                    className="director-agent-panel-icon-button"
+                                    aria-label="上传图片"
+                                    data-tip={attachments.length >= ATTACHMENT_LIMIT ? `最多 ${ATTACHMENT_LIMIT} 张图片` : "上传图片"}
+                                    disabled={attachments.length >= ATTACHMENT_LIMIT || sending}
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <ImagePlus aria-hidden="true" size={14} />
+                                </button>
                                 <button
                                     type="button"
                                     className={`director-agent-panel-icon-button${showAppearance ? " is-active" : ""}`}
                                     aria-label="助手外观设置"
-                                    title="助手外观设置"
+                                    data-tip="助手外观设置"
                                     onClick={() => setShowAppearance((value) => !value)}
                                 >
                                     <SlidersHorizontal aria-hidden="true" size={14} />
                                 </button>
-                                <button type="button" className="director-agent-panel-icon-button" aria-label="清空对话" title="清空对话" onClick={clear}>
+                                <button type="button" className="director-agent-panel-icon-button" aria-label="清空对话" data-tip={turns.length ? "清空对话" : "暂无对话"} disabled={!turns.length && !sending} onClick={clear}>
                                     <Eraser aria-hidden="true" size={14} />
                                 </button>
-                                <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || !draft.trim()} onClick={submit}>
+                                <button type="button" className="director-agent-panel-send" aria-label="发送" disabled={sending || (!draft.trim() && !attachments.length)} onClick={submit}>
                                     <ArrowUp aria-hidden="true" size={15} />
                                 </button>
                             </div>

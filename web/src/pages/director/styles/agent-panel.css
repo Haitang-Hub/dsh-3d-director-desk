@@ -52,10 +52,55 @@
   border-bottom-right-radius: 0;
 }
 
+/* 停靠时的内侧宽度拖柄 */
+.director-agent-panel-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  z-index: 5;
+  touch-action: none;
+}
+
+.director-agent-panel-resize:hover {
+  background: linear-gradient(90deg, transparent, rgb(120 170 255 / 0.18));
+}
+
+.director-agent-panel.is-docked[data-dock="right"] .director-agent-panel-resize {
+  left: -3px;
+}
+
+.director-agent-panel.is-docked[data-dock="left"] .director-agent-panel-resize {
+  right: -3px;
+}
+
+/* 悬浮态尺寸由内联样式（floatW/floatH）驱动：右下角手柄自由调整 */
 .director-agent-panel.is-floating {
-  width: 344px;
-  height: min(72vh, 680px);
   border-radius: 14px;
+}
+
+/* 悬浮态右下角自由调宽高手柄 */
+.director-agent-panel-float-resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 6;
+  width: 16px;
+  height: 16px;
+  color: rgb(var(--text-muted-rgb));
+  opacity: 0.6;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.director-agent-panel-float-resize:hover {
+  opacity: 1;
+}
+
+.director-agent-panel-float-resize svg {
+  width: 100%;
+  height: 100%;
 }
 
 .director-agent-panel.is-collapsed {
@@ -124,7 +169,59 @@
 
 .director-agent-panel-icon-button:hover {
   color: rgb(var(--text-rgb));
-  background: rgb(140 175 255 / 0.16);
+  background: rgb(255 255 255 / 0.1);
+}
+
+/* 风格化 tooltip：深色圆角白字，替代原生 title 系统气泡 */
+.director-agent-panel [data-tip] {
+  position: relative;
+}
+
+/* 拖柄本身是绝对定位的（贴面板边缘），不能被 tooltip 的 relative 覆盖 */
+.director-agent-panel .director-agent-panel-resize,
+.director-agent-panel .director-agent-panel-float-resize {
+  position: absolute;
+}
+
+.director-agent-panel [data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 30;
+  padding: 5px 10px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 0.72);
+  background: rgb(26 29 37 / 0.96);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.5);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-2px);
+  transition:
+    opacity 0.14s ease 0.35s,
+    transform 0.14s ease 0.35s;
+}
+
+.director-agent-panel [data-tip]:hover::after,
+.director-agent-panel [data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 输入区在面板底部，tooltip 向上弹出避免溢出 */
+.director-agent-panel-composer [data-tip]::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(2px);
+}
+
+.director-agent-panel-composer [data-tip]:hover::after,
+.director-agent-panel-composer [data-tip]:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
 }
 
 .director-agent-panel-body {
@@ -200,35 +297,69 @@
 }
 
 .director-agent-panel-tool {
-  align-self: flex-start;
-  max-width: 96%;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 8px;
-  padding: 4px 9px;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 11px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.035);
+}
+
+.director-agent-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 12px;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: rgb(var(--text-muted-rgb));
-  background: rgb(255 255 255 / 0.05);
+  color: rgb(var(--text-rgb));
+  background: transparent;
   cursor: pointer;
 }
 
-.director-agent-panel-tool:hover {
-  color: rgb(var(--text-rgb));
-  border-color: rgb(var(--accent-rgb) / 0.5);
+.director-agent-tool-icon {
+  flex-shrink: 0;
+  color: rgb(74 222 128);
 }
 
-.director-agent-panel-tool.is-error {
-  border-color: rgba(248, 113, 113, 0.45);
+.director-agent-panel-tool.is-error .director-agent-tool-icon {
+  color: rgb(248 113 113);
+}
+
+.director-agent-tool-label {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--text-muted-rgb));
+}
+
+.director-agent-tool-label strong {
+  font-weight: 600;
+  color: rgb(var(--text-rgb));
+}
+
+.director-agent-tool-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: rgb(74 222 128);
+}
+
+.director-agent-tool-status.is-failed {
   color: #fca5a5;
 }
 
-.director-agent-panel-tool.is-expanded {
+.director-agent-tool-summary {
   overflow-wrap: anywhere;
+  padding: 0 11px 8px 34px;
+  font-size: 11px;
+  line-height: 1.55;
   white-space: pre-wrap;
+  color: rgb(var(--text-muted-rgb));
 }
 
 .director-agent-panel-activity {
@@ -259,6 +390,7 @@
 .director-agent-panel-composer-bar {
   display: flex;
   align-items: center;
+  /* 模型选择贴左，工具按钮组保持靠右 */
   justify-content: space-between;
   gap: 8px;
   padding: 0 8px 8px 6px;
@@ -350,11 +482,11 @@
   flex-direction: column;
   gap: 1px;
   min-width: 216px;
-  max-height: 240px;
+  max-height: 190px;
   overflow-y: auto;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 12px;
-  padding: 4px;
+  padding: 3px;
   background: rgb(12 18 34 / 0.92);
   box-shadow: 0 14px 40px rgb(0 0 0 / 0.55);
   backdrop-filter: blur(22px) saturate(160%);
@@ -374,9 +506,10 @@
   overflow: hidden;
   border: none;
   border-radius: 8px;
-  padding: 6px 9px;
+  padding: 3px 9px;
   font-family: inherit;
   font-size: 11px;
+  line-height: 1.45;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -517,6 +650,10 @@
   gap: 6px;
 }
 
+.director-agent-process-toggle:disabled {
+  cursor: default;
+}
+
 .director-agent-process-toggle {
   display: inline-flex;
   align-items: center;
@@ -583,9 +720,18 @@
 }
 
 .director-agent-appearance-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 12.5px;
   font-weight: 500;
   color: rgb(var(--text-muted-rgb));
+}
+
+.director-agent-appearance-value {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--text-muted-rgb) / 0.85);
 }
 
 .director-agent-appearance-block input[type="range"] {
@@ -596,74 +742,98 @@
   cursor: pointer;
 }
 
-.director-agent-appearance-row {
+
+/* 输入区图片附件：预览条 + 缩略图 */
+.director-agent-attachments {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 6px;
 }
 
-.director-agent-appearance-row input[type="checkbox"] {
+.director-agent-attachment {
   position: relative;
-  flex-shrink: 0;
-  width: 34px;
-  height: 19px;
-  border: none;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.16);
-  cursor: pointer;
-  appearance: none;
-  transition: background-color 0.16s ease;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 8px;
 }
 
-.director-agent-appearance-row input[type="checkbox"]::after {
-  content: "";
+.director-agent-attachment img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.director-agent-attachment-remove {
   position: absolute;
   top: 2px;
-  left: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
   width: 15px;
   height: 15px;
+  border: none;
   border-radius: 50%;
-  background: #fff;
-  transition: transform 0.16s ease;
+  color: #fff;
+  background: rgb(0 0 0 / 0.65);
+  cursor: pointer;
+  transition: background-color 0.14s ease;
 }
 
-.director-agent-appearance-row input[type="checkbox"]:checked {
-  background: rgb(77 143 248);
+.director-agent-attachment-remove:hover {
+  background: rgb(248 113 113 / 0.85);
 }
 
-.director-agent-appearance-row input[type="checkbox"]:checked::after {
-  transform: translateX(15px);
-}
-
-/* 紧凑模式 */
-.director-agent-panel.is-compact.is-floating {
-  width: 300px;
-}
-
-.director-agent-panel.is-compact.is-docked {
-  width: 320px;
-}
-
-.director-agent-panel.is-compact .director-agent-panel-header {
-  min-height: 34px;
-}
-
-.director-agent-panel.is-compact .director-agent-panel-messages {
-  gap: 6px;
-  padding: 8px 10px;
-}
-
-.director-agent-panel.is-compact .director-agent-panel-bubble {
-  padding: 6px 9px;
-  font-size: 11.5px;
-}
-
-.director-agent-panel.is-compact .director-agent-panel-input {
-  min-height: 40px;
-  font-size: 12px;
-}
-
-.director-agent-panel.is-compact .director-agent-panel-hint {
+.director-agent-attach-error {
+  padding: 0 2px 6px;
   font-size: 11px;
+  color: #fca5a5;
+}
+
+/* 用户气泡内的图片缩略图 */
+.director-agent-bubble-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.director-agent-bubble-image {
+  max-width: 150px;
+  max-height: 110px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+/* 渲染单帧预览：对话内直接展示截图 */
+.director-agent-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.director-agent-preview {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.3);
+}
+
+.director-agent-preview img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  cursor: zoom-in;
+}
+
+.director-agent-preview figcaption {
+  padding: 4px 10px;
+  font-size: 10.5px;
+  color: rgb(255 255 255 / 0.45);
+  border-top: 1px solid rgb(255 255 255 / 0.08);
 }

@@ -17,7 +17,7 @@ import { GEOMETRY_PRIMITIVE_OPTIONS } from "../schema/directorProject";
 import { MANNEQUIN_POSE_PRESETS } from "../presets/mannequinPosePresets";
 import { CHARACTER_ACTION_PRESETS } from "../presets/characterActionPresets";
 import { CAMERA_PATH_TEMPLATES, createCameraPathTemplate } from "../motion/cameraPathTemplates";
-import { BUILTIN_LIFE_MODELS } from "../modelLibrary/modelLibraryCatalog";
+import { getModelLibraryItems } from "../modelLibrary/modelLibraryCatalog";
 import { CAMERA_MOTION_PRESETS, getCameraMotionPresetPatch } from "../motion/cameraMotionPresets";
 import { useDirectorStore } from "../store/directorStore";
 import { readActiveDirectorDeskId } from "../workspaces/directorDeskRegistry";
@@ -71,7 +71,7 @@ export type DirectorToolInput = {
 
 const DIRECTOR_AGENT_PROTOCOL_VERSION = 7;
 /** 桥实现版本：服务端在多个导演台页面同时连接时优先路由到最新版本。 */
-const DIRECTOR_BRIDGE_VERSION = 6;
+const DIRECTOR_BRIDGE_VERSION = 8;
 /** 本项目自有桥（director-mcp，端口 17372）的默认地址；自动发现失败即保持纯前端可用。 */
 export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17372";
 
@@ -137,7 +137,12 @@ export function DirectorAgentBridge() {
             source.addEventListener("hello", (event) => {
                 const hello = parseData(event);
                 if (!hello || disposed) return;
-                if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) source?.close();
+                if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) {
+                    source?.close();
+                    return;
+                }
+                // ready 状态挂在单次 SSE 连接上，断线自动重连后会随旧连接丢失；hello 每次建连都下发，借此重新上报
+                reportReady();
             });
             source.addEventListener("tool_call", (event) => {
                 const payload = parseData(event) as { requestId?: string; name?: string; input?: DirectorToolInput } | null;
@@ -201,30 +206,42 @@ export async function runDirectorTool(name: string, input: DirectorToolInput) {
             };
         }
         case "stage_add_model": {
-            // 从模型库放置模型：按 assetId/name 匹配内置模型库条目，注册资产并创建场景对象。
+            // 从模型库放置模型：先精确匹配（ID/名称）再双向子串模糊匹配，搜索范围是完整模型库目录
+            // （Mixamo/Guo 角色 + Guo 道具 + 内置生活模型），已注册资产（asset_*）直接复用。
+            // 库目录条目走 addImportedAsset 并透传角色 rig 字段，与模型库面板 addModelLibraryItem 同一入参形态。
             const project = useDirectorStore.getState().project;
             const known = new Map((project.assets || []).filter((asset) => asset.sourceType === "model" && asset.kind !== "panorama").map((asset) => [asset.id, asset]));
             const wanted = input.assetId || input.name || "";
-            const libraryItem = BUILTIN_LIFE_MODELS.find((item) => item.id === wanted || item.name === wanted || item.name.includes(wanted) || wanted.includes(item.name));
+            if (!wanted) throw new Error("缺少 assetId 或 name，用 stage_list_presets 查询 library");
+            const catalog = getModelLibraryItems();
+            // 中文名为主，enName 保留清单原始英文名，老会话按英文名调用也能命中
+            const matchesExactly = (item: (typeof catalog)[number], candidate: string) => item.name === candidate || item.enName === candidate;
+            const matchesFuzzily = (item: (typeof catalog)[number], candidate: string) =>
+                item.name.includes(candidate) || candidate.includes(item.name)
+                || (item.enName !== undefined && (item.enName.includes(candidate) || candidate.includes(item.enName)));
+            const libraryItem = catalog.find((item) => matchesExactly(item, wanted)) || catalog.find((item) => matchesFuzzily(item, wanted));
             if (!libraryItem && !known.has(wanted)) throw new Error(`模型库中找不到模型：${wanted}，用 stage_list_presets 查询 library`);
             let objectId: string | null = null;
-            if (libraryItem && !known.has(libraryItem.id)) {
+            if (libraryItem && !known.has(wanted)) {
                 store.addImportedAsset({
-                    kind: (libraryItem as { kind?: string }).kind ?? "prop",
+                    kind: libraryItem.kind ?? "prop",
                     assetSource: "library",
                     fileName: libraryItem.fileName,
                     name: libraryItem.name,
                     url: libraryItem.url,
                     modelFormat: libraryItem.fileName.toLowerCase().endsWith(".glb") ? "glb" : libraryItem.fileName.toLowerCase().endsWith(".fbx") ? "fbx" : undefined,
+                    characterRigProfile: libraryItem.characterRigProfile,
+                    characterImportReadiness: libraryItem.characterImportReadiness,
+                    characterOrientationCorrection: libraryItem.characterOrientationCorrection,
                 });
                 objectId = useDirectorStore.getState().selectedObjectId;
             } else {
-                objectId = store.addObjectFromAsset(libraryItem ? libraryItem.id : wanted);
+                objectId = store.addObjectFromAsset(wanted);
             }
             if (!objectId) throw new Error(`添加模型失败：${wanted}`);
             applyObjectPlacement(objectId, input);
             if (input.name) store.updateObjectName(objectId, input.name);
-            return { objectId, assetId: libraryItem?.id || wanted, name: input.name || libraryItem?.name };
+            return { objectId, assetId: libraryItem?.id || wanted, name: input.name || libraryItem?.name, kind: libraryItem?.kind ?? "prop" };
         }
         case "stage_clear_scene": {
             // 清空场景：删除全部角色与道具；keepCameras 默认 true 时机位对象一并保留。
@@ -243,7 +260,11 @@ export async function runDirectorTool(name: string, input: DirectorToolInput) {
                 poses: MANNEQUIN_POSE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label })),
                 actions: CHARACTER_ACTION_PRESETS.map((preset) => ({ id: preset.id, label: preset.label })),
                 geometries: GEOMETRY_PRIMITIVE_OPTIONS.map((option) => ({ id: option.type, label: option.label })),
-                library: useDirectorStore.getState().project.assets.filter((asset) => asset.sourceType === "model" && asset.kind !== "panorama").map((asset) => ({ id: asset.id, label: asset.name })),
+                // 模型库全目录（含分类与角色/道具标记）+ 本地导入的"我的模型"，stage_add_model 的 assetId 由此查询
+                library: [
+                    ...getModelLibraryItems().map((item) => ({ id: item.id, label: item.name, categoryId: item.categoryId, kind: item.kind ?? "prop" })),
+                    ...store.project.assets.filter((asset) => asset.sourceType === "model" && asset.kind !== "panorama" && asset.assetSource === "local").map((asset) => ({ id: asset.id, label: asset.name || asset.fileName, categoryId: "my-models" as const, kind: asset.kind === "character" ? "character" : "prop" })),
+                ],
                 motionTemplates: {
                     official: CAMERA_PATH_TEMPLATES.filter((template) => template.group === "official").map((template) => ({ id: template.id, label: template.label, description: template.description })),
                     community: CAMERA_PATH_TEMPLATES.filter((template) => template.group === "community").map((template) => ({ id: template.id, label: template.label, description: template.description })),

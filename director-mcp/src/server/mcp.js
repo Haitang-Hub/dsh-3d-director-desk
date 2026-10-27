@@ -81,7 +81,9 @@ export async function handleMethod(method, params) {
     switch (method) {
         case "initialize":
             return {
-                protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(params.protocolVersion) ? params.protocolVersion : SUPPORTED_PROTOCOL_VERSIONS[SUPPORTED_PROTOCOL_VERSIONS.length - 1],
+                // 客户端请求的版本不在支持列表时，回退到服务端支持的“最新”版本：
+                // streamable HTTP 传输自 2025-03-26 引入，回退过老（2024-11-05）与传输语义不匹配。
+                protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(params.protocolVersion) ? params.protocolVersion : SUPPORTED_PROTOCOL_VERSIONS[0],
                 capabilities: { tools: {} },
                 serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
                 instructions: MCP_INSTRUCTIONS,

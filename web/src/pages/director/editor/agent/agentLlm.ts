@@ -5,8 +5,11 @@
 
 import { buildApiUrl, decodeChannelModel, resolveModelChannel, useConfigStore } from "@/stores/use-config-store";
 
+export type AgentContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 export type AgentLlmMessage =
-    | { role: "system" | "user" | "assistant"; content: string; tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+    | { role: "system" | "assistant"; content: string; tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+    | { role: "user"; content: string | AgentContentPart[] }
     | { role: "tool"; tool_call_id: string; content: string };
 
 type ChatCompletionResponse = {
@@ -103,7 +106,13 @@ async function callOpenAiLlm(requestConfig: AgentRequestConfig, messages: AgentL
 
 /* ---------- Anthropic 原生协议（/v1/messages）---------- */
 
-type AnthropicBlock = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } | { type: "tool_result"; tool_use_id: string; content: string };
+type AnthropicBlock = { type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } | { type: "tool_result"; tool_use_id: string; content: string };
+
+/** data:image/png;base64,… → Anthropic base64 图片块；非 data URL 图片返回 null 跳过。 */
+function anthropicImageBlock(url: string): AnthropicBlock | null {
+    const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(url);
+    return match ? { type: "image", source: { type: "base64", media_type: match[1], data: match[2] } } : null;
+}
 
 /** 把 OpenAI 形态的消息历史转成 Anthropic：system 独立、tool_calls → tool_use、连续 tool 结果合并为 tool_result。 */
 function toAnthropicMessages(messages: AgentLlmMessage[]) {
@@ -111,7 +120,21 @@ function toAnthropicMessages(messages: AgentLlmMessage[]) {
     for (const message of messages) {
         if (message.role === "system") continue;
         if (message.role === "user") {
-            out.push({ role: "user", content: [{ type: "text", text: message.content }] });
+            const blocks: AnthropicBlock[] = [];
+            if (typeof message.content === "string") {
+                blocks.push({ type: "text", text: message.content });
+            } else {
+                for (const part of message.content) {
+                    if (part.type === "text") {
+                        if (part.text.trim()) blocks.push({ type: "text", text: part.text });
+                    } else {
+                        const image = anthropicImageBlock(part.image_url.url);
+                        if (image) blocks.push(image);
+                    }
+                }
+            }
+            if (!blocks.length) blocks.push({ type: "text", text: "(empty)" });
+            out.push({ role: "user", content: blocks });
             continue;
         }
         if (message.role === "assistant") {

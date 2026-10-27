@@ -1,5 +1,6 @@
 import guoCharactersManifest from "./guoCharactersManifest.json";
 import guoPropsManifest from "./guoPropsManifest.json";
+import { guoPropZhName } from "./guoPropZhNames";
 import type { CharacterImportReadiness, CharacterRigProfile } from "../schema/directorProject";
 import { getGuoCharacterCompatibility } from "./guoCharacterCompatibility";
 
@@ -20,6 +21,8 @@ export type ModelLibraryItem = {
   fileName: string;
   id: string;
   name: string;
+  /** 原始英文名别名（清单 label 为英文时由中英映射保留），仅用于 Agent 按英文名匹配，UI 不展示。 */
+  enName?: string;
   thumbUrl?: string;
   url: string;
   kind?: "character" | "prop";
@@ -68,7 +71,6 @@ function createBuiltInThumbnail(name: string, categoryId: ModelLibraryCategoryId
 const BUILTIN_LIFE_MODEL_INPUTS: Array<Omit<ModelLibraryItem, "id" | "thumbUrl" | "url">> = [
   { categoryId: "convenience", fileName: "ATM_low.fbx", name: "自动取款机" },
   { categoryId: "convenience", fileName: "trash_sorting_low.fbx", name: "分类垃圾桶" },
-  { categoryId: "home", fileName: "sofa_modern_low.fbx", name: "沙发" },
   { categoryId: "home", fileName: "dining_table_low.fbx", name: "餐桌" },
   { categoryId: "home", fileName: "refrigerator_modern_low.fbx", name: "冰箱" },
   { categoryId: "home", fileName: "washing_machine_modern_low.fbx", name: "洗衣机" },
@@ -164,7 +166,8 @@ export const GUO_PROP_MODELS: ModelLibraryItem[] = (guoPropsManifest.items as Gu
   kind: "prop",
   categoryId: mapGuoPropCategory(item.categoryId),
   fileName: item.localModelPath.split("/").pop() ?? `${item.id}.fbx`,
-  name: item.label,
+  name: guoPropZhName(item.label),
+  enName: item.label.trim(),
   url: localAssetUrl(`guo-mounted-props-200/${item.localModelPath}`),
   thumbUrl: localAssetUrl(`guo-mounted-props-200/${item.localThumbnailPath}`),
 }));

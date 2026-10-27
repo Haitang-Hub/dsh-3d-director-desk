@@ -25,7 +25,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 
 import { DirectorBridge, ToolError } from "./bridge.js";
 import { handleMethod as handleMcpMethod } from "./mcp.js";
@@ -34,6 +34,54 @@ import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../proto
 const PORT = Number(process.env.STORE_PORT || 17372);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
 const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "data"));
+
+// 站点伺服（阶段二）：让桥直接承载导演台 Web 构建产物，Desktop 工作台面板的 iframe
+// 与 AI 工具共用同一 origin（SSE executor 自动同源接入）。优先级：DIRECTOR_SITE_DIR >
+// 打包布局（dsh-plugin/bridge 同级的 site/）> 仓库布局（web/dist）。
+const SITE_CANDIDATES = [
+    process.env.DIRECTOR_SITE_DIR?.trim(),
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "site"),
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "web", "dist"),
+].filter(Boolean).map((dir) => resolve(dir));
+const SITE_DIR = SITE_CANDIDATES.find((dir) => fs.existsSync(join(dir, "index.html"))) || "";
+
+const MIME_TYPES = {
+    ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+    ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2",
+    ".mp4": "video/mp4", ".webm": "video/webm", ".fbx": "application/octet-stream",
+    ".glb": "model/gltf-binary", ".gltf": "model/gltf+json", ".md": "text/markdown; charset=utf-8",
+};
+
+/**
+ * 按站点静态规则响应；返回 true 表示已处理，false 表示未处理、调用方继续走后续路由。
+ * spaFallback=false 时只命中真实存在的文件（存储 /assets 穿透用，避免把“键不存在”
+ * 伪装成 200 的 index.html 骗过应用的资源加载判断）。
+ */
+function serveSite(req, res, pathname, spaFallback = true) {
+    if (!SITE_DIR || (req.method !== "GET" && req.method !== "HEAD")) return false;
+    const relative = pathname.replace(/^\/+/, "") || "index.html";
+    const file = resolve(SITE_DIR, relative);
+    if (!file.startsWith(SITE_DIR + sep)) return false; // 拒绝越界路径
+    let target = file;
+    if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
+        // SPA 回退：无扩展名的路径交给 index.html（react-router 前端路由）
+        const last = relative.split("/").pop() || "";
+        if (!spaFallback || last.includes(".")) return false;
+        target = join(SITE_DIR, "index.html");
+        if (!fs.existsSync(target)) return false;
+    }
+    const headers = { "content-type": MIME_TYPES[extname(target).toLowerCase()] || "application/octet-stream" };
+    if (target.endsWith("index.html")) headers["cache-control"] = "no-store";
+    if (req.method === "HEAD") {
+        headers["content-length"] = String(fs.statSync(target).size);
+        send(res, 200, null, headers);
+    } else {
+        send(res, 200, fs.readFileSync(target), headers);
+    }
+    return true;
+}
 
 const encodeKey = (key) => encodeURIComponent(key);
 
@@ -213,7 +261,11 @@ const server = http.createServer(async (req, res) => {
             }
             if (req.method === "GET" || req.method === "HEAD") {
                 const bin = join(dir, `${base}.bin`);
-                if (!fs.existsSync(bin)) return sendJson(res, 404, { ok: false, error: "not found" });
+                if (!fs.existsSync(bin)) {
+                    // 存储键缺失时只允许精确文件穿透（vite 的 /assets/*.js|css 与存储键共用 /assets 前缀）
+                    if (serveSite(req, res, pathname, false)) return;
+                    return sendJson(res, 404, { ok: false, error: "not found" });
+                }
                 let mimeType = "application/octet-stream";
                 try {
                     mimeType = JSON.parse(fs.readFileSync(join(dir, `${base}.meta.json`), "utf8")).mimeType || mimeType;
@@ -231,6 +283,9 @@ const server = http.createServer(async (req, res) => {
                 return sendJson(res, 200, { ok: true });
             }
         }
+
+        // 站点静态兜底（阶段二）：未匹配任何 API/桥路由的 GET 交给导演台 Web 应用
+        if (serveSite(req, res, pathname)) return;
 
         return sendJson(res, 404, { ok: false, error: "not found" });
     } catch (error) {

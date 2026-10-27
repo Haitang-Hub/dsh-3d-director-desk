@@ -40,12 +40,12 @@ export const TOOLS = [
         name: "stage_add_model",
         group: "stage",
         timeoutClass: "state",
-        description: "从模型库添加模型到场景（内置人模/道具库或已有资产），可同时指定摆放位置与朝向。",
+        description: "从模型库添加模型到场景（完整目录：人物/便利生活/居家生活/户外出行/工具配件，或已导入资产），可用 assetId 精确选择或按名称匹配，可同时指定摆放位置与朝向。",
         inputSchema: {
             type: "object",
             properties: {
-                assetId: { type: "string", description: "模型库资产 ID（用 stage_list_presets 查询 library）" },
-                name: { type: "string", description: "模型名或对象名（按名称模糊匹配模型库）" },
+                assetId: { type: "string", description: "模型库条目 ID（用 stage_list_presets 查询 library，形如 guo-prop:* / guo-character:* / builtin:* / asset_*）" },
+                name: { type: "string", description: "模型名称（先精确后模糊匹配模型库目录）" },
                 ...placementProperties,
             },
         },
@@ -66,7 +66,7 @@ export const TOOLS = [
         name: "stage_list_presets",
         group: "stage",
         timeoutClass: "state",
-        description: "列出可用预设：姿势、动作、几何体、模型库、运镜模板、运镜节奏、可跟踪身体部位。摆场/运镜前用它查询合法取值。",
+        description: "列出可用预设：姿势、动作、几何体、模型库全目录（id/名称/分类/角色或道具）、运镜模板、运镜节奏、可跟踪身体部位。摆场/运镜前用它查询合法取值。",
         inputSchema: { type: "object", properties: {} },
     },
     {

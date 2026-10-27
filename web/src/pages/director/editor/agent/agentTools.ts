@@ -22,10 +22,10 @@ export const DIRECTOR_AGENT_SYSTEM_PROMPT = [
     "运镜可 camera_apply_preset 快捷生成，或 camera_set_pose 调视角后 camera_set_keyframe 逐帧记录（至少 2 个关键帧才能出片）；",
     "需要确认构图时 preview_render_frame 出单帧；最终成片用 preview_export_animatic（耗时可达数分钟）。",
     "破坏性操作（stage_clear_scene、stage_remove_object、camera_delete_keyframe）执行前先向用户确认或先 stage_get_state 核对。",
-    "回答用中文、简洁；汇报结果时引用返回的对象 ID 与文件名，方便用户在界面上对照。",
+    "回答用中文、像同事对话一样自然简洁。用户对技术细节不敏感：最终结论里禁止出现内部对象 ID、坐标精确值和文件名；可以用 **加粗** 突出关键对象（如 **人物A**），但不要用列表符号或代码格式。",
     "输出协议（用户界面只展示进度与结论，过程会被折叠）：",
     "- 中间轮次（还要继续调用工具时）：只写一行不超过 40 字的进度说明，说明刚完成什么/接下来做什么，不要输出推理、方案罗列或长篇解释；",
-    "- 最终轮次（不再调用工具时）：输出面向用户的最终结论——直接给出结果摘要（做了什么、关键对象 ID/文件名、成片或帧在哪看），简洁分点即可。",
+    "- 最终轮次（不再调用工具时）：用 2~4 句话描述场景现在的效果（谁在哪、什么姿态关系、镜头怎么动），最后给一句可选的下一步建议。preview_render_frame 渲染的单帧会由界面自动展示给用户，不要在文字里描述文件名或查看方式。",
 ].join("\n");
 
 export const DIRECTOR_AGENT_TOOLS: Array<{ type: "function"; function: { name: string; description: string; parameters: AgentToolParameterSchema } }> = [
@@ -34,12 +34,12 @@ export const DIRECTOR_AGENT_TOOLS: Array<{ type: "function"; function: { name: s
         type: "function",
         function: {
             name: "stage_add_model",
-            description: "从模型库添加模型到场景，可同时指定摆放位置与朝向。",
-            parameters: { type: "object", properties: { ...placement, assetId: { type: "string", description: "模型库资产 ID（stage_list_presets 查询 library）；name 也可用于模糊匹配模型库" } } },
+            description: "从模型库添加模型到场景（完整目录：人物/便利生活/居家生活/户外出行/工具配件，或已导入资产），可同时指定摆放位置与朝向。",
+            parameters: { type: "object", properties: { ...placement, assetId: { type: "string", description: "模型库条目 ID（stage_list_presets 查询 library，精确选择）；name 也可按名称匹配模型库" } } },
         },
     },
     { type: "function", function: { name: "stage_clear_scene", description: "清空场景：删除全部角色与道具（机位默认保留）。破坏性操作。", parameters: { type: "object", properties: { keepCameras: { type: "boolean", description: "是否保留机位，默认 true" } } } } },
-    { type: "function", function: { name: "stage_list_presets", description: "列出可用预设：姿势、动作、几何体、模型库、运镜模板、运镜节奏、可跟踪身体部位。", parameters: { type: "object", properties: {} } } },
+    { type: "function", function: { name: "stage_list_presets", description: "列出可用预设：姿势、动作、几何体、模型库全目录（id/名称/分类）、运镜模板、运镜节奏、可跟踪身体部位。", parameters: { type: "object", properties: {} } } },
     {
         type: "function",
         function: {

@@ -4,26 +4,29 @@
  * baseUrl 采用带 /v1 的配置方式（buildApiUrl 会自动补 /v1）。无配置导入导出。
  */
 
-import { useState } from "react";
-import { Download, Eye, EyeOff, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Download, Eye, EyeOff, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { buildApiUrl, createModelChannel, decodeChannelModel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ChannelModel, type ModelChannel } from "@/stores/use-config-store";
 
-/** 渠道草稿的模型行：文本模型 + 视觉能力勾选。 */
-type DraftModel = { name: string; vision: boolean };
+/** 每个渠道最多配置的模型数量。 */
+const MAX_CHANNEL_MODELS = 4;
+
+/** 渠道草稿的模型行（只支持文本模型）。 */
+type DraftModel = { name: string };
 
 function toDraftModels(models: ChannelModel[]): DraftModel[] {
-    return models.map((model) => ({ name: model.name, vision: Boolean(model.vision) }));
+    return models.map((model) => ({ name: model.name }));
 }
 
-function toChannelModels(models: Array<{ name: string; vision?: boolean }>): ChannelModel[] {
+function toChannelModels(models: Array<{ name: string }>): ChannelModel[] {
     const seen = new Set<string>();
     const result: ChannelModel[] = [];
     for (const model of models) {
         const name = model.name.trim();
         if (!name || seen.has(name)) continue;
         seen.add(name);
-        result.push({ name, capability: "text", ...(model.vision ? { vision: true } : {}) });
+        result.push({ name, capability: "text" });
     }
     return result;
 }
@@ -58,33 +61,81 @@ async function fetchChannelModels(channel: ModelChannel): Promise<string[]> {
 
 const PROTOCOL_LABEL: Record<string, string> = { openai: "OpenAI 兼容", anthropic: "Anthropic 原生", gemini: "Gemini" };
 
+/** 渠道草稿校验：返回按字段的错误信息，全部通过时为空对象。 */
+function validateDraft(draft: ModelChannel): Partial<Record<"baseUrl" | "apiKey" | "models", string>> {
+    const errors: Partial<Record<"baseUrl" | "apiKey" | "models", string>> = {};
+    if (!draft.baseUrl.trim()) errors.baseUrl = "请填写接口地址";
+    else if (!/^https?:\/\//i.test(draft.baseUrl.trim())) errors.baseUrl = "地址需以 http(s):// 开头";
+    if (!draft.apiKey.trim()) errors.apiKey = "请填写 API Key";
+    if (!draft.models.length) errors.models = "至少需要一个模型";
+    return errors;
+}
+
 /** 单个渠道的编辑器（草稿态，保存才写回 store）。 */
 function ChannelEditor({ draft, isNew, onChange, onSave, onCancel }: { draft: ModelChannel; isNew: boolean; onChange: (patch: Partial<ModelChannel>) => void; onSave: () => void; onCancel: () => void }) {
     const [showKey, setShowKey] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [fetchError, setFetchError] = useState("");
+    const [candidates, setCandidates] = useState<string[] | null>(null);
+    const [submitted, setSubmitted] = useState(false);
+    const nameRef = useRef<HTMLInputElement>(null);
+
+    const errors = validateDraft(draft);
+    const showError = (field: "baseUrl" | "apiKey" | "models") => (submitted && errors[field] ? errors[field] : "");
+    const selectedNames = new Set(draft.models.map((model) => model.name.trim()));
+
+    // 打开编辑器时聚焦渠道名称，方便直接改名
+    useEffect(() => {
+        nameRef.current?.select();
+    }, []);
 
     function updateModel(index: number, patch: Partial<DraftModel>) {
-        onChange({ models: toChannelModels(draft.models.map((model, i) => (i === index ? { ...model, ...patch } : model))) });
+        onChange({ models: draft.models.map((model, i) => (i === index ? { ...model, ...patch } : model)) });
     }
 
     function addModel() {
-        onChange({ models: toChannelModels([...draft.models, { name: "", vision: false }]) });
+        if (draft.models.length >= MAX_CHANNEL_MODELS) {
+            setFetchError(`一个渠道最多配置 ${MAX_CHANNEL_MODELS} 个模型。`);
+            return;
+        }
+        setFetchError("");
+        onChange({ models: [...draft.models, { name: "", capability: "text" }] });
     }
 
     function removeModel(index: number) {
-        onChange({ models: toChannelModels(draft.models.filter((_, i) => i !== index)) });
+        setFetchError("");
+        onChange({ models: draft.models.filter((_, i) => i !== index) });
+    }
+
+    /** 勾选/取消候选模型；取消直接移除，勾选受 4 个上限约束。 */
+    function toggleCandidate(name: string) {
+        if (selectedNames.has(name)) {
+            onChange({ models: draft.models.filter((model) => model.name.trim() !== name) });
+            return;
+        }
+        if (draft.models.length >= MAX_CHANNEL_MODELS) {
+            setFetchError(`一个渠道最多配置 ${MAX_CHANNEL_MODELS} 个模型，请先取消一个再选择。`);
+            return;
+        }
+        setFetchError("");
+        onChange({ models: [...draft.models, { name, capability: "text" }] });
     }
 
     async function pullModels() {
+        if (!draft.baseUrl.trim() || !draft.apiKey.trim()) {
+            setFetchError("拉取前请先填写接口地址与 API Key。");
+            return;
+        }
         setFetching(true);
         setFetchError("");
         try {
             const names = await fetchChannelModels(draft);
-            const existing = new Set(draft.models.map((model) => model.name.trim()));
-            const merged = [...draft.models, ...names.filter((name) => !existing.has(name)).map((name) => ({ name, vision: false }))];
-            onChange({ models: toChannelModels(merged) });
-            if (!names.length) setFetchError("接口没有返回任何模型");
+            if (!names.length) {
+                setFetchError("接口没有返回任何模型");
+                setCandidates(null);
+            } else {
+                setCandidates(names);
+            }
         } catch (error) {
             setFetchError(error instanceof Error ? error.message : String(error));
         } finally {
@@ -92,12 +143,26 @@ function ChannelEditor({ draft, isNew, onChange, onSave, onCancel }: { draft: Mo
         }
     }
 
+    function save() {
+        setSubmitted(true);
+        if (Object.keys(errors).length) return;
+        onSave();
+    }
+
     return (
         <div className="dcfg-editor">
+            <div className="dcfg-editor-intro">
+                <button type="button" className="dcfg-back-button" aria-label="返回渠道列表" onClick={onCancel}>
+                    <ArrowLeft aria-hidden="true" size={14} />
+                    返回
+                </button>
+                <span className="dcfg-editor-intro-text">{isNew ? "填写接口信息，模型可稍后在列表中调整。" : `正在编辑「${draft.name || "未命名渠道"}」`}</span>
+            </div>
+
             <div className="dcfg-field-grid">
                 <label className="dcfg-field">
                     <span>渠道名称</span>
-                    <input className="dcfg-input" value={draft.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="例如 Agnes / 官方直连" />
+                    <input ref={nameRef} className="dcfg-input" value={draft.name} onChange={(event) => onChange({ name: event.target.value })} placeholder="例如 Agnes / 官方直连" />
                 </label>
                 <div className="dcfg-field">
                     <span>协议</span>
@@ -124,12 +189,20 @@ function ChannelEditor({ draft, isNew, onChange, onSave, onCancel }: { draft: Mo
                 </div>
             </div>
             <label className="dcfg-field">
-                <span>接口地址（以 /v1 结尾）</span>
-                <input className="dcfg-input dcfg-input-mono" value={draft.baseUrl} onChange={(event) => onChange({ baseUrl: event.target.value })} placeholder="https://api.example.com/v1" />
+                <span>
+                    接口地址 <em className="dcfg-field-hint">以 /v1 结尾，未写时自动补全</em>
+                </span>
+                <input
+                    className={`dcfg-input dcfg-input-mono${showError("baseUrl") ? " is-invalid" : ""}`}
+                    value={draft.baseUrl}
+                    onChange={(event) => onChange({ baseUrl: event.target.value })}
+                    placeholder="https://api.example.com/v1"
+                />
+                {showError("baseUrl") ? <span className="dcfg-field-error">{showError("baseUrl")}</span> : null}
             </label>
             <label className="dcfg-field">
                 <span>API Key</span>
-                <div className="dcfg-key-row">
+                <div className={`dcfg-key-row${showError("apiKey") ? " is-invalid" : ""}`}>
                     <input
                         className="dcfg-input dcfg-input-mono"
                         type={showKey ? "text" : "password"}
@@ -138,40 +211,68 @@ function ChannelEditor({ draft, isNew, onChange, onSave, onCancel }: { draft: Mo
                         onChange={(event) => onChange({ apiKey: event.target.value })}
                         placeholder="sk-…"
                     />
-                    <button type="button" className="dcfg-icon-button" aria-label={showKey ? "隐藏密钥" : "显示密钥"} onClick={() => setShowKey((value) => !value)}>
+                    <button type="button" className="dcfg-key-eye" aria-label={showKey ? "隐藏密钥" : "显示密钥"} onClick={() => setShowKey((value) => !value)}>
                         {showKey ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
                     </button>
                 </div>
+                {showError("apiKey") ? <span className="dcfg-field-error">{showError("apiKey")}</span> : null}
             </label>
 
             <div className="dcfg-models">
                 <div className="dcfg-models-head">
                     <div>
-                        <div className="dcfg-models-title">渠道模型</div>
-                        <div className="dcfg-models-sub">只用文本模型；具备读图能力的模型勾选「视觉」。</div>
+                        <div className="dcfg-models-title">
+                            渠道模型
+                            <span className="dcfg-models-count">
+                                {draft.models.length}/{MAX_CHANNEL_MODELS}
+                            </span>
+                        </div>
+                        <div className="dcfg-models-sub">只支持文本模型。先「从接口拉取」候选列表，再勾选要使用的模型。</div>
                     </div>
                     <div className="dcfg-models-actions">
                         <button type="button" className="dcfg-secondary-button" onClick={addModel}>
-                            <Plus aria-hidden="true" size={13} /> 添加模型
+                            <Plus aria-hidden="true" size={13} /> 手动添加
                         </button>
                         <button type="button" className="dcfg-secondary-button" onClick={() => void pullModels()} disabled={fetching}>
-                            {fetching ? <Loader2 aria-hidden="true" size={13} className="dcfg-spin" /> : <Download aria-hidden="true" size={13} />} 拉取模型
+                            {fetching ? <Loader2 aria-hidden="true" size={13} className="dcfg-spin" /> : <Download aria-hidden="true" size={13} />} 从接口拉取
                         </button>
                     </div>
                 </div>
                 {fetchError ? <div className="dcfg-fetch-error">{fetchError}</div> : null}
+                {candidates ? (
+                    <div className="dcfg-candidates">
+                        <div className="dcfg-candidates-head">接口返回 {candidates.length} 个模型，勾选加入渠道</div>
+                        <div className="dcfg-candidate-list">
+                            {candidates.map((name) => {
+                                const selected = selectedNames.has(name);
+                                const full = !selected && draft.models.length >= MAX_CHANNEL_MODELS;
+                                return (
+                                    <button
+                                        key={name}
+                                        type="button"
+                                        className={`dcfg-candidate${selected ? " is-selected" : ""}${full ? " is-full" : ""}`}
+                                        aria-pressed={selected}
+                                        onClick={() => toggleCandidate(name)}
+                                    >
+                                        <span className={`dcfg-candidate-check${selected ? " is-on" : ""}`} aria-hidden="true" />
+                                        <span className="dcfg-candidate-name">{name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
                 {draft.models.length === 0 ? (
-                    <div className="dcfg-models-empty">还没有模型：手动添加，或点「拉取模型」从接口获取。</div>
+                    <div className="dcfg-models-empty">
+                        还没有选择模型。推荐「从接口拉取」后勾选，也可以手动添加。
+                        {showError("models") ? <span className="dcfg-field-error">{showError("models")}</span> : null}
+                    </div>
                 ) : (
                     <div className="dcfg-model-list">
                         {draft.models.map((model, index) => (
                             <div key={index} className="dcfg-model-row">
                                 <input className="dcfg-input dcfg-model-name" value={model.name} onChange={(event) => updateModel(index, { name: event.target.value })} placeholder="模型 ID，例如 claude-sonnet-4-5" />
-                                <label className="dcfg-vision-toggle" title="该模型是否具备视觉（读图）能力">
-                                    <input type="checkbox" checked={model.vision} onChange={(event) => updateModel(index, { vision: event.target.checked })} />
-                                    视觉
-                                </label>
-                                <button type="button" className="dcfg-icon-button is-danger" aria-label={`删除模型 ${model.name || ""}`} onClick={() => removeModel(index)}>
+                                <button type="button" className="dcfg-icon-button is-danger" aria-label={`移除模型 ${model.name || ""}`} onClick={() => removeModel(index)}>
                                     <Trash2 aria-hidden="true" size={13} />
                                 </button>
                             </div>
@@ -184,9 +285,69 @@ function ChannelEditor({ draft, isNew, onChange, onSave, onCancel }: { draft: Mo
                 <button type="button" className="dcfg-secondary-button" onClick={onCancel}>
                     取消
                 </button>
-                <button type="button" className="dcfg-primary-button" onClick={onSave}>
-                    {isNew ? "创建渠道" : "保存"}
+                <button type="button" className="dcfg-primary-button" onClick={save}>
+                    {isNew ? "创建渠道" : "保存修改"}
                 </button>
+            </div>
+        </div>
+    );
+}
+
+/** 渠道列表中的一张卡片；删除需要二次确认。 */
+function ChannelCard({ channel, isAgentChannel, canDelete, onEdit, onDelete }: { channel: ModelChannel; isAgentChannel: boolean; canDelete: boolean; onEdit: () => void; onDelete: () => void }) {
+    const [confirming, setConfirming] = useState(false);
+
+    // 进入确认态后 3 秒未操作自动退出，避免停留在危险状态
+    useEffect(() => {
+        if (!confirming) return;
+        const timer = window.setTimeout(() => setConfirming(false), 3000);
+        return () => window.clearTimeout(timer);
+    }, [confirming]);
+
+    return (
+        <div className={`dcfg-channel-card${isAgentChannel ? " is-active" : ""}`}>
+            <div className="dcfg-channel-info">
+                <div className="dcfg-channel-name">
+                    {channel.name || "未命名渠道"}
+                    {isAgentChannel ? <span className="dcfg-channel-badge">Agent 使用中</span> : null}
+                </div>
+                <div className="dcfg-channel-meta">
+                    <span className="dcfg-channel-protocol">{PROTOCOL_LABEL[channel.apiFormat] || channel.apiFormat}</span>
+                    <span className="dcfg-channel-dot" aria-hidden="true" />
+                    <span>
+                        {channel.models.length} 个模型
+                    </span>
+                </div>
+                <div className="dcfg-channel-url">{channel.baseUrl || "未配置地址"}</div>
+            </div>
+            <div className="dcfg-channel-actions">
+                {confirming ? (
+                    <>
+                        <span className="dcfg-channel-confirm-text">确认删除？</span>
+                        <button type="button" className="dcfg-danger-button" disabled={!canDelete} onClick={() => { setConfirming(false); onDelete(); }}>
+                            删除
+                        </button>
+                        <button type="button" className="dcfg-secondary-button" onClick={() => setConfirming(false)}>
+                            取消
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button type="button" className="dcfg-secondary-button" onClick={onEdit}>
+                            <Pencil aria-hidden="true" size={12} /> 编辑
+                        </button>
+                        <button
+                            type="button"
+                            className="dcfg-icon-button is-danger"
+                            aria-label={`删除渠道 ${channel.name || ""}`}
+                            disabled={!canDelete}
+                            title={canDelete ? "删除渠道" : "至少保留一个渠道"}
+                            onClick={() => setConfirming(true)}
+                        >
+                            <Trash2 aria-hidden="true" size={13} />
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -222,16 +383,16 @@ export function AppConfigModal() {
     function saveDraft() {
         if (!editing) return;
         const draft = editing.draft;
-        if (!draft.baseUrl.trim() || !draft.apiKey.trim()) {
-            setError("接口地址与 API Key 不能为空。");
-            return;
+        const channels = [...config.channels];
+        const exists = channels.some((channel) => channel.id === draft.id);
+        // 写回前截断到上限，防御旧数据或绕过 UI 的路径
+        const capped = { ...draft, models: toChannelModels(draft.models).slice(0, MAX_CHANNEL_MODELS) };
+        if (exists) {
+            const index = channels.findIndex((channel) => channel.id === draft.id);
+            channels[index] = capped;
+        } else {
+            channels.push(capped);
         }
-        if (!draft.models.length) {
-            setError("至少添加一个模型（可手动添加或点「拉取模型」）。");
-            return;
-        }
-        const exists = config.channels.some((channel) => channel.id === draft.id);
-        const channels = exists ? config.channels.map((channel) => (channel.id === draft.id ? draft : channel)) : [...config.channels, draft];
         commitChannels(withChannels(config, channels), channels);
         setEditing(null);
         setError("");
@@ -251,8 +412,8 @@ export function AppConfigModal() {
             <div className="dcfg-modal" role="dialog" aria-label="模型渠道配置">
                 <header className="dcfg-header">
                     <div>
-                        <h3 className="dcfg-title">模型渠道配置</h3>
-                        <p className="dcfg-subtitle">配置 Agent 使用的模型渠道 · 本地存储，密钥不出本机</p>
+                        <h3 className="dcfg-title">{editing ? (editing.isNew ? "新增渠道" : "编辑渠道") : "模型渠道配置"}</h3>
+                        <p className="dcfg-subtitle">{editing ? "密钥只保存在本机浏览器中，不会上传。" : "配置 Agent 使用的模型渠道 · 本地存储，密钥不出本机"}</p>
                     </div>
                     <button type="button" className="dcfg-icon-button" aria-label="关闭" onClick={close}>
                         <X aria-hidden="true" size={16} />
@@ -271,7 +432,10 @@ export function AppConfigModal() {
                     ) : (
                         <>
                             <div className="dcfg-list-head">
-                                <span className="dcfg-list-hint">{config.channels.length} 个渠道</span>
+                                <span className="dcfg-list-hint">
+                                    共 {config.channels.length} 个渠道，Agent 当前使用「
+                                    {config.channels.find((channel) => decodeChannelModel(config.textModel)?.channelId === channel.id)?.name || "未选择"}」
+                                </span>
                                 <button type="button" className="dcfg-primary-button" onClick={startAdd}>
                                     <Plus aria-hidden="true" size={13} /> 新增渠道
                                 </button>
@@ -281,31 +445,7 @@ export function AppConfigModal() {
                                 {config.channels.map((channel) => {
                                     const isAgentChannel = decodeChannelModel(config.textModel)?.channelId === channel.id;
                                     return (
-                                        <div key={channel.id} className={`dcfg-channel-card${isAgentChannel ? " is-active" : ""}`}>
-                                            <div className="dcfg-channel-info">
-                                                <div className="dcfg-channel-name">
-                                                    {channel.name || "未命名渠道"}
-                                                    {isAgentChannel ? <span className="dcfg-channel-badge">Agent 使用中</span> : null}
-                                                </div>
-                                                <div className="dcfg-channel-meta">
-                                                    {PROTOCOL_LABEL[channel.apiFormat] || channel.apiFormat} · {channel.models.length} 个模型 · {channel.baseUrl || "未配置地址"}
-                                                </div>
-                                            </div>
-                                            <div className="dcfg-channel-actions">
-                                                <button type="button" className="dcfg-secondary-button" onClick={() => startEdit(channel)}>
-                                                    <Pencil aria-hidden="true" size={12} /> 编辑
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="dcfg-icon-button is-danger"
-                                                    aria-label={`删除渠道 ${channel.name || ""}`}
-                                                    disabled={config.channels.length <= 1}
-                                                    onClick={() => deleteChannel(channel.id)}
-                                                >
-                                                    <Trash2 aria-hidden="true" size={13} />
-                                                </button>
-                                            </div>
-                                        </div>
+                                        <ChannelCard key={channel.id} channel={channel} isAgentChannel={isAgentChannel} canDelete={config.channels.length > 1} onEdit={() => startEdit(channel)} onDelete={() => deleteChannel(channel.id)} />
                                     );
                                 })}
                             </div>
@@ -316,7 +456,7 @@ export function AppConfigModal() {
 
                 {!editing ? (
                     <footer className="dcfg-footer">
-                        <button type="button" className="dcfg-primary-button" onClick={close}>
+                        <button type="button" className="dcfg-secondary-button" onClick={close}>
                             完成
                         </button>
                     </footer>

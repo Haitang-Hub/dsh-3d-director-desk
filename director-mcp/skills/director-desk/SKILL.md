@@ -16,7 +16,8 @@ description: 用 3D 导演台（director-desk）的 stage/camera/preview 工具�
 2. **摆场景**：
    - 角色：`stage_place_character`（可带 pose 预设、位置 x/y/z、朝向 rotation、缩放）。
    - 道具：`stage_place_prop`（geometryType: box/sphere/cylinder/torus/cone/pyramid）。
-   - 库模型：`stage_add_model`（assetId 或名称模糊匹配，library 列表来自 stage_list_presets）。
+   - 库模型：`stage_add_model`（assetId 精确选择或名称匹配，覆盖人物/便利生活/居家生活/户外出行/
+     工具配件全目录；assetId 用 stage_list_presets 的 library 查询，条目带 categoryId 与 kind）。
    - 微调：`stage_update_object`（位置/颜色/可见/姿势/动作）；删除用 `stage_remove_object`。
    - 坐标系：x 右、y 上、z 前；rotation 是绕 Y 轴角度（度）。两人对话让角色面对面
      （rotation 相差约 180°），间距 1.5~2.5。
