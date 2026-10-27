@@ -2,7 +2,8 @@
 
 从原 Canvas Director 项目拆分出的独立项目，只保留 3D 导演台核心功能：场景层级
 管理、3D 视口（摆人物/道具、XYZ 变换）、镜头运镜（掌机/路线/成片预演）、时间轴
-与参考视频导出。纯前端项目，无需任何后端服务即可使用。
+与参考视频导出。纯前端项目，无需任何后端服务即可使用；同时以 `dsh-plugin/`
+打包为 DeepSeek Harness（DSH Desktop）的右侧栏插件（发布物在 main 分支）。
 
 ## 目录结构
 
@@ -13,7 +14,8 @@
 │       ├── index.tsx       导演台首页：新建/打开/删除导演台、快速上手
 │       └── editor-page.tsx 全屏编辑器（/director/editor，不带顶部导航）
 ├── director-mcp/  常驻本地服务（端口 17372）：文件存储 + AI 桥 + stdio MCP 门面
-├── docs/          桥协议等文档
+├── dsh-plugin/    DSH Desktop 插件包（dsh/ lib/ 入口与声明；bridge/ site/ 由 sync 生成，不入库）
+├── docs/          桥协议等文档（docs/archive/ 为历史方案）
 ├── start.bat      Windows 一键启动
 └── start.ps1      PowerShell 一键启动
 ```
@@ -92,4 +94,4 @@ node bridge-selftest.js  # 桥全回路自测
 
 - 配置与工程文件支持导入导出（设置弹窗与首页卡片）
 - 状态类工具的服务端直写（executor 离线时直接改写 `data/kv/` 场景工程）
-- 常驻无头浏览器作为渲染 worker（批量出片编排），见 `修改方案.md` 阶段三。
+- 常驻无头浏览器作为渲染 worker（批量出片编排），见 `docs/archive/修改方案.md` 阶段三。
