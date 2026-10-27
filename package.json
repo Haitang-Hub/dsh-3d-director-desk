@@ -19,15 +19,13 @@
     "README.md"
   ],
   "scripts": {
-    "sync": "node scripts/sync-assets.mjs",
-    "pack:all": "npm run sync && npm pack"
+    "pack": "npm pack"
   },
   "license": "MIT",
   "author": "Haitang-Hub",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Haitang-Hub/dsh-3d-director-desk.git",
-    "directory": "dsh-plugin"
+    "url": "git+https://github.com/Haitang-Hub/dsh-3d-director-desk.git"
   },
   "keywords": [
     "dsh-plugin",
