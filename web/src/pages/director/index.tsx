@@ -1,11 +1,12 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowDownToLine, ArrowRight, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
 const HOME_QUICK_START_STEPS = [
-  ["打开导演台", "经插件面板「新窗口」按钮或 /director/editor 地址在新窗口打开编辑器，自动恢复上次使用的工程。"],
+  ["打开导演台", "点击本页「打开导演台」进入编辑器，自动恢复上次使用的工程。"],
   ["摆人物和道具", "从工具栏添加模型，选中后使用 XYZ 三轴移动、旋转和缩放。"],
   ["记录镜头", "点击“运镜 → 开始掌镜”，用 WASD 移动，每到一个镜头按 Enter。"],
   ["预演并导出", "先“看路线”检查轨迹，再“看成片”，满意后导出 MP4 参考视频。"],
@@ -123,6 +124,7 @@ const HOME_PROJECT_MANAGEMENT = [
 
 /** 帮助文档页：原首页的使用说明内容；工程管理等功能已内嵌到导演台编辑器的「工程目录」中。 */
 export default function DirectorHelpPage() {
+  const navigate = useNavigate();
   const theme = useThemeStore((state) => state.theme);
   // AI 桥（director-mcp）在线状态：null = 探测中
   const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null);
@@ -137,6 +139,18 @@ export default function DirectorHelpPage() {
     };
   }, []);
 
+  // 路由级标签页标题：AppProviders 挂载时会写入全局标题，这里在其后再断言一次；
+  // 离开帮助页时恢复默认标题（浏览器标签里能分清当前是帮助文档还是导演台）。
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      document.title = "帮助文档 · 3D 导演台";
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.title = "3D 导演台";
+    };
+  }, []);
+
   return (
     <div className="h-dvh overflow-hidden">
       <div className="director-desk-app h-full" data-theme={theme === "dark" ? "dark" : "light"}>
@@ -146,7 +160,7 @@ export default function DirectorHelpPage() {
               <p className="director-home-kicker">3D Director Desk · Help</p>
               <h1>3D 导演台帮助文档</h1>
               <p>
-                导演台编辑器经插件面板「新窗口」按钮或 /director/editor 地址在新窗口打开；新建、导入、导出、删除工程都在编辑器顶栏的「工程目录」里完成。
+                打开站点首页即进入导演台编辑器；新建、导入、导出、删除工程都在编辑器顶栏的「工程目录」里完成。
                 本页只保留使用说明，供随时查阅。
               </p>
               <span
@@ -169,6 +183,10 @@ export default function DirectorHelpPage() {
               </span>
             </div>
             <div className="director-home-hero-actions">
+              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
+                <ArrowRight aria-hidden="true" size={18} />
+                打开导演台
+              </button>
               <a className="director-home-scroll-hint" href="#director-home-guide-title">
                 向下查看使用说明
                 <ArrowDownToLine aria-hidden="true" size={14} />
