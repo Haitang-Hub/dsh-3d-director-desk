@@ -97,12 +97,46 @@ window.__ModuleLoader__.load({
     function DirectorDeskTab() {
       const info = useBridgeInfo()
       const [nonce, setNonce] = useState(0)
+      const [busy, setBusy] = useState(false)
+      const [actionError, setActionError] = useState('')
+
+      // 手动重建桥：宿主端 POST 会杀子进程并重新拉起，随后状态由 5s 轮询刷新。
+      const restartBridge = () => {
+        setBusy(true)
+        setActionError('')
+        fetch('/api/director-desk.restart-bridge', { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+            if (data && data.ready === false) setActionError(String(data.error || '桥仍未就绪'))
+            setNonce(value => value + 1)
+          })
+          .catch(error => setActionError(String(error?.message ?? error)))
+          .finally(() => setBusy(false))
+      }
+
+      const openExternal = () => {
+        if (info?.port) window.open(`http://127.0.0.1:${info.port}/`, '_blank', 'noopener')
+      }
 
       return h('div', { style: SHELL_STYLE },
         h('div', { style: TOOLBAR_STYLE },
           h('span', { style: { fontWeight: 600, color: 'var(--dsw-alias-label-primary)' } }, '导演台'),
           h('span', { title: info?.error ? String(info.error) : '' }, statusText(info)),
           h('span', { style: { flex: 1 } }),
+          h('button', {
+            type: 'button',
+            style: LINK_BUTTON_STYLE,
+            disabled: !info?.ready,
+            onClick: openExternal,
+            title: '在独立窗口打开画布（面板太窄时更好用）',
+          }, '新窗口'),
+          h('button', {
+            type: 'button',
+            style: LINK_BUTTON_STYLE,
+            disabled: busy,
+            onClick: restartBridge,
+            title: '重建本地导演台服务（不用重启应用）',
+          }, busy ? '重启中…' : '重启服务'),
           h('button', {
             type: 'button',
             style: LINK_BUTTON_STYLE,
@@ -122,9 +156,10 @@ window.__ModuleLoader__.load({
             h('div', null,
               h('p', { style: { margin: '0 0 6px' } }, '导演台服务未就绪。'),
               h('p', { style: { margin: 0 } },
-                info?.error ? String(info.error).slice(0, 200) : '正在等待本地桥启动…'),
+                info?.error ? String(info.error).slice(0, 200) : '正在启动本地服务（首次约几秒）…'),
               h('p', { style: { margin: '6px 0 0' } },
-                '画布就绪后，AI 才能通过 stage_* / camera_* / preview_* 工具改动场景。'),
+                '插件每 8 秒自动重试一次；也可以点上方「重启服务」立刻重建。'),
+              actionError ? h('p', { style: { margin: '6px 0 0', color: '#d25555' } }, actionError) : null,
             ),
           ),
       )
