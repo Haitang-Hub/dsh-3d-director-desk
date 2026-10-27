@@ -4,3 +4,7 @@ data/
 *.log
 .DS_Store
 Thumbs.db
+# full 分支的工作目录，切分支残留在磁盘时不要进 main
+web/
+director-mcp/
+dsh-plugin/
