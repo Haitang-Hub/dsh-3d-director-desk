@@ -2481,3 +2481,11 @@
   line-height: 1.55;
   color: rgb(255 255 255 / 0.45);
 }
+
+/* 窄面板隐藏视口坐标指示器（XYZ 彩色节点，alignment center-center 常驻画布中部），
+   避免与顶部工具条和场景内容重叠 */
+@media (max-width: 1200px) {
+  .viewport-gizmo-overlay {
+    display: none;
+  }
+}
