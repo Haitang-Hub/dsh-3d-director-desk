@@ -2481,3 +2481,23 @@
   line-height: 1.55;
   color: rgb(255 255 255 / 0.45);
 }
+
+/* 窄面板：视口工具条挪到时间轴上方，避免与跟随选中物体的三轴控制器（XYZ 彩色节点）重叠；
+   工具条弹出菜单相应改为向上展开 */
+@media (max-width: 1200px) {
+  .app-shell .viewport-toolbar {
+    top: auto !important;
+    bottom: 124px !important;
+  }
+
+  .app-shell :is(.viewport-toolbar-menu, .viewport-toolbar-submenu) {
+    top: auto !important;
+    bottom: calc(100% + 8px) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-shell .viewport-toolbar {
+    bottom: 176px !important;
+  }
+}
