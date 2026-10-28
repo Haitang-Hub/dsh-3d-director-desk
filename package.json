@@ -1,6 +1,6 @@
 {
   "name": "dsh-3d-director-desk",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "3D 导演台右侧栏插件：画布与对话并排，Agent 经 director-desk 工具实时编排场景。",
   "type": "module",
   "main": "./dsh/index.js",
