@@ -73,8 +73,8 @@ window.__ModuleLoader__.load({
     }
 
     function statusText(info) {
-      if (info === undefined) return '连接中…'
-      return info.ready ? '画布已连接' : '画布未就绪'
+      if (info === undefined) return '导演台连接中…'
+      return info.ready ? '导演台已连接' : '导演台未就绪'
     }
 
     /** 轮询本地桥状态；失败时降级，并把原因留给占位文案。 */
@@ -94,8 +94,12 @@ window.__ModuleLoader__.load({
     }
 
     /** 右侧栏标签正文：工具栏 + 导演台画布。 */
-    function DirectorDeskTab() {
+    function DirectorDeskTab({ useTabInfo }) {
       const info = useBridgeInfo()
+      // 画布插件经 sidebarRight.openTab('director-desk', { params: { instanceId } }) 打开本标签时，
+      // 导航参数带目标实例：iframe 据此加载 /director/editor?instanceId=...（无参保持根路径旧行为）。
+      const tabInfo = useTabInfo()
+      const instanceId = tabInfo?.tab?.navigation?.params?.instanceId
       const [nonce, setNonce] = useState(0)
       const [busy, setBusy] = useState(false)
       const [actionError, setActionError] = useState('')
@@ -146,8 +150,8 @@ window.__ModuleLoader__.load({
         ),
         info?.ready
           ? h('iframe', {
-            key: nonce,
-            src: `http://127.0.0.1:${info.port}/`,
+            key: `${instanceId || 'root'}#${nonce}`,
+            src: `http://127.0.0.1:${info.port}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`,
             title: '3D 导演台',
             style: IFRAME_STYLE,
             'data-dsh-no-drag': '',
