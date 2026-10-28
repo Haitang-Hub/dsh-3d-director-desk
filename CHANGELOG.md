@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
++ [调整] AI 助手悬浮面板的左右磁吸停靠范围从 56px 缩小到 26px，拖到更贴近边缘才会吸附。
 + [调整] README 面板形态描述修正为右侧栏标签（原文误写为 desktopWorkbenches.register 分栏）；补充 MIT LICENSE 文件。
 
 + [调整] 帮助文档移除「群友贡献」章节（模型资产内的授权署名信息不受影响）。
