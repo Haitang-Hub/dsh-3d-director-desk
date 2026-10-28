@@ -267,7 +267,7 @@ export function DirectorAgentChatPanel() {
 
     const [layout, setLayout] = useState<PanelLayout>(loadLayout);
     const [dragging, setDragging] = useState(false);
-    // 拖动预览遮罩：接近左/右边缘时显示 10px 宽的吸附位置提示条
+    // 拖动预览遮罩：接近左/右边缘时显示与停靠面板同尺寸的幽灵预览
     const [dockPreview, setDockPreview] = useState<"left" | "right" | null>(null);
     const [draft, setDraft] = useState("");
     const [attachments, setAttachments] = useState<string[]>([]);
@@ -363,7 +363,7 @@ export function DirectorAgentChatPanel() {
         const maxX = window.innerWidth - 80;
         const maxY = window.innerHeight - 48;
         setLayout((current) => ({ ...current, mode: "float", x: Math.min(Math.max(x, -FLOAT_WIDTH + 80), maxX), y: Math.min(Math.max(y, 0), maxY) }));
-        // 拖动预览遮罩：面板任一边缘进入吸附范围即显示对应侧提示条
+        // 拖动预览遮罩：面板任一边缘进入吸附范围即显示对应侧的停靠预览
         const floatW = panelRef.current?.getBoundingClientRect().width ?? 0;
         const right = x + floatW;
         setDockPreview(
@@ -496,8 +496,8 @@ export function DirectorAgentChatPanel() {
 
     return (
         <>
-            {/* 拖动预览遮罩：10px 宽的边缘吸附提示条（放在面板外，避免面板 backdrop-filter 改变 fixed 定位基准） */}
-            {dragging && dockPreview ? <div className={`director-agent-dock-preview is-${dockPreview}`} aria-hidden="true" /> : null}
+            {/* 拖动预览遮罩：与松手后停靠面板同尺寸的幽灵预览（放在面板外，避免面板 backdrop-filter 改变 fixed 定位基准） */}
+            {dragging && dockPreview ? <div className={`director-agent-dock-preview is-${dockPreview}`} style={{ width: layout.width }} aria-hidden="true" /> : null}
             <aside
                 ref={panelRef}
                 className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""}`}

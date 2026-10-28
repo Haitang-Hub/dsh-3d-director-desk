@@ -838,24 +838,25 @@
   border-top: 1px solid rgb(255 255 255 / 0.08);
 }
 
-/* 拖动预览遮罩：拖动面板接近左/右边缘时，显示 10px 宽的吸附位置提示条 */
+/* 拖动预览遮罩：拖动接近左/右边缘时，显示与松手后停靠面板同尺寸的幽灵预览（宽度由内联样式取 layout.width） */
 .director-agent-dock-preview {
   position: fixed;
   top: 0;
   bottom: 0;
-  width: 10px;
   z-index: 79;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.34), rgb(var(--accent-rgb) / 0.16));
-  box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.28);
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.22), rgb(var(--accent-rgb) / 0.08));
+  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.45);
 }
 
 .director-agent-dock-preview.is-left {
   left: 0;
-  border-right: 1px solid rgb(var(--accent-rgb) / 0.5);
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
 }
 
 .director-agent-dock-preview.is-right {
   right: 0;
-  border-left: 1px solid rgb(var(--accent-rgb) / 0.5);
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
 }
