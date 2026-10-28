@@ -9,7 +9,7 @@ import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirec
 type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean; glassAlpha: number; width: number; floatW: number; floatH: number };
 
 const LAYOUT_STORAGE_KEY = "director-agent-panel-layout-v1";
-const DOCK_SNAP_DISTANCE = 26;
+const DOCK_SNAP_DISTANCE = 16;
 const FLOAT_WIDTH = 344;
 const FLOAT_MIN_W = 320;
 const FLOAT_MIN_H = 360;
