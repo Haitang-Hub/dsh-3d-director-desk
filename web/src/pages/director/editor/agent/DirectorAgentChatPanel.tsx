@@ -9,7 +9,7 @@ import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirec
 type PanelLayout = { mode: "left" | "right" | "float"; x: number; y: number; collapsed: boolean; glassAlpha: number; width: number; floatW: number; floatH: number };
 
 const LAYOUT_STORAGE_KEY = "director-agent-panel-layout-v1";
-const DOCK_SNAP_DISTANCE = 16;
+const DOCK_SNAP_DISTANCE = 10;
 const FLOAT_WIDTH = 344;
 const FLOAT_MIN_W = 320;
 const FLOAT_MIN_H = 360;
@@ -267,6 +267,8 @@ export function DirectorAgentChatPanel() {
 
     const [layout, setLayout] = useState<PanelLayout>(loadLayout);
     const [dragging, setDragging] = useState(false);
+    // 拖动预览遮罩：接近左/右边缘时显示 10px 宽的吸附位置提示条
+    const [dockPreview, setDockPreview] = useState<"left" | "right" | null>(null);
     const [draft, setDraft] = useState("");
     const [attachments, setAttachments] = useState<string[]>([]);
     const [attachError, setAttachError] = useState("");
@@ -361,6 +363,12 @@ export function DirectorAgentChatPanel() {
         const maxX = window.innerWidth - 80;
         const maxY = window.innerHeight - 48;
         setLayout((current) => ({ ...current, mode: "float", x: Math.min(Math.max(x, -FLOAT_WIDTH + 80), maxX), y: Math.min(Math.max(y, 0), maxY) }));
+        // 拖动预览遮罩：面板任一边缘进入吸附范围即显示对应侧提示条
+        const floatW = panelRef.current?.getBoundingClientRect().width ?? 0;
+        const right = x + floatW;
+        setDockPreview(
+            x < DOCK_SNAP_DISTANCE ? "left" : right > window.innerWidth - DOCK_SNAP_DISTANCE ? "right" : null
+        );
     }
 
     function onHeaderPointerUp(event: React.PointerEvent) {
@@ -371,6 +379,7 @@ export function DirectorAgentChatPanel() {
         const top = event.clientY - drag.offsetY;
         dragRef.current = null;
         setDragging(false);
+        setDockPreview(null);
         // 磁性吸附：接近左右边缘时停靠
         setLayout((current) => {
             const right = left + current.floatW;
@@ -486,14 +495,17 @@ export function DirectorAgentChatPanel() {
     const showBody = !layout.collapsed;
 
     return (
-        <aside
-            ref={panelRef}
-            className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""}`}
-            data-dock={docked ? layout.mode : undefined}
-            style={{ ...(floatStyle || {}), ...(docked ? { width: layout.width } : {}), "--director-agent-glass-alpha": layout.glassAlpha } as React.CSSProperties}
-            role="dialog"
-            aria-label="AI 助手"
-        >
+        <>
+            {/* 拖动预览遮罩：10px 宽的边缘吸附提示条（放在面板外，避免面板 backdrop-filter 改变 fixed 定位基准） */}
+            {dragging && dockPreview ? <div className={`director-agent-dock-preview is-${dockPreview}`} aria-hidden="true" /> : null}
+            <aside
+                ref={panelRef}
+                className={`director-agent-panel ${docked ? "is-docked" : "is-floating"} ${layout.collapsed ? "is-collapsed" : ""} ${dragging ? "is-dragging" : ""}`}
+                data-dock={docked ? layout.mode : undefined}
+                style={{ ...(floatStyle || {}), ...(docked ? { width: layout.width } : {}), "--director-agent-glass-alpha": layout.glassAlpha } as React.CSSProperties}
+                role="dialog"
+                aria-label="AI 助手"
+            >
             <header
                 className="director-agent-panel-header"
                 onPointerDown={onHeaderPointerDown}
@@ -638,6 +650,7 @@ export function DirectorAgentChatPanel() {
                 </div>
             ) : null}
         </aside>
+        </>
     );
 }
 

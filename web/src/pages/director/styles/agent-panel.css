@@ -837,3 +837,25 @@
   color: rgb(255 255 255 / 0.45);
   border-top: 1px solid rgb(255 255 255 / 0.08);
 }
+
+/* 拖动预览遮罩：拖动面板接近左/右边缘时，显示 10px 宽的吸附位置提示条 */
+.director-agent-dock-preview {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 79;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.34), rgb(var(--accent-rgb) / 0.16));
+  box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.28);
+}
+
+.director-agent-dock-preview.is-left {
+  left: 0;
+  border-right: 1px solid rgb(var(--accent-rgb) / 0.5);
+}
+
+.director-agent-dock-preview.is-right {
+  right: 0;
+  border-left: 1px solid rgb(var(--accent-rgb) / 0.5);
+}
