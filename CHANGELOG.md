@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## Unreleased
++ [新增] AI 助手面板拖动时显示 10px 宽的边缘吸附预览遮罩；磁吸停靠范围从 16px 缩小到 10px。
 + [调整] AI 助手悬浮面板的左右磁吸停靠范围从 26px 进一步缩小到 16px。
 + [调整] AI 助手悬浮面板的左右磁吸停靠范围从 56px 缩小到 26px，拖到更贴近边缘才会吸附。
 + [调整] README 面板形态描述修正为右侧栏标签（原文误写为 desktopWorkbenches.register 分栏）；补充 MIT LICENSE 文件。
