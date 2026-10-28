@@ -663,6 +663,7 @@ export function DirectorAgentChatToggle() {
             className={`top-bar-motion-button${open ? " is-active" : ""}`}
             type="button"
             aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
+            title={open ? "关闭 AI 助手" : "打开 AI 助手"}
             aria-pressed={open}
             onClick={toggle}
         >
