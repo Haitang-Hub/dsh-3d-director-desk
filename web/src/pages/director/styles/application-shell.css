@@ -2093,7 +2093,15 @@
     --left-sidebar-width: min(218px, 29vw);
   }
 
-  /* 小屏保留顶栏右侧的 AI 助手与模型配置（三列布局，名称列自动收缩） */
+  /* 小屏保留顶栏右侧的 AI 助手与模型配置；右列按内容取宽避免压缩换行 */
+  .app-shell .top-bar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .app-shell .top-bar-right .top-bar-motion-button {
+    flex-shrink: 0;
+  }
+
   .app-shell .left-sidebar {
     width: var(--left-sidebar-width);
   }
@@ -2147,13 +2155,14 @@
 
   .app-shell .top-bar-right .top-bar-motion-button {
     flex-shrink: 0;
-    /* 覆盖 motion-workspace.css 对所有磁吸按钮的图标态：右组 AI 助手在 421-600px 保留文字 */
-    width: auto;
-    min-width: 0;
+    /* 覆盖 motion-workspace.css：极窄时右组 AI 助手只留图标，避免文字换行 */
+    width: 32px;
+    min-width: 32px;
     height: 32px;
-    padding: 0 8px;
-    gap: 6px;
-    font-size: 11px;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+    justify-content: center;
   }
 
   /* 极窄时收起次要的视角手感/性能触发器，为右侧 AI 助手+模型配置让位 */
@@ -2188,15 +2197,6 @@
 }
 
 @media (max-width: 420px) {
-  .app-shell .top-bar-right .top-bar-motion-button {
-    width: 32px;
-    min-width: 32px;
-    padding: 0;
-    gap: 0;
-    font-size: 0;
-    justify-content: center;
-  }
-
   .app-shell .mode-toggle-button {
     min-width: 0;
     padding: 0 7px;
