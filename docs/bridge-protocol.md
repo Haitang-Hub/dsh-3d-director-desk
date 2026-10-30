@@ -10,10 +10,18 @@
 
 - **executor**：导演台编辑器页面（`web/src/pages/director/editor`），挂载
   `DirectorAgentBridge`，以 `role=director` 接入 SSE，真正执行 stage/camera/preview 工具。
-- **桥**：`director-mcp/`（端口 17372，仅绑 127.0.0.1），管理 executor 注册表，
+- **桥**：`director-mcp/`（插件托管端口 17372、开发态默认 17383，仅绑 127.0.0.1），管理 executor 注册表，
   接收 MCP/HTTP 工具调用并路由、计时、审计。
 - **调用方**：MCP stdio 门面（`node director-mcp/index.js mcp`）或直接 HTTP
   `POST /director/tool`。
+
+## 鉴权（2026-10-31 起，对齐 canvas-agent）
+
+桥启动时生成随机 token（`DIRECTOR_BRIDGE_TOKEN` 可覆盖），经 `GET /bootstrap` 下发——仅当请求无
+Origin 或 Origin 为本机回环时才含 token 字段。数据端点（`/events`、`/director/*`、`/kv`、
+`/assets`、`/skills`）一律要求 `x-director-token` 头或 `?token=` 查询参数，失败返回 401
+`{"ok":false,"error":"invalid token"}`。豁免：`/health`、`/bootstrap`、`/mcp`、OPTIONS 与
+静态站点文件（SSE 无法带自定义头，统一走 `?token=`）。
 
 ## Executor 侧端点（web → 桥）
 
@@ -56,7 +64,7 @@ SSE 下行事件：
 
 | code | 含义 |
 | ---- | ---- |
-| `executor_offline` | 没有就绪的导演台页面，hint 提示打开 http://localhost:5080 |
+| `executor_offline` | 没有就绪的导演台页面，hint 提示打开桥实际地址（http://127.0.0.1:端口） |
 | `timeout` | executor 执行超时（分级超时） |
 | `executor_disconnected` | executor 在调用中途断开 |
 | `unknown_tool` | 工具名不在 tools.js 注册表 |

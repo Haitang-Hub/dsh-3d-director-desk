@@ -1,13 +1,13 @@
 /**
- * director-mcp 常驻 HTTP 服务（零依赖，端口 17372，仅绑 127.0.0.1）。
+ * director-mcp 常驻 HTTP 服务（零依赖；开发态默认 17383、插件托管显式传 STORE_PORT=17372，仅绑 127.0.0.1）。
  * 一个进程三个角色：
  *   1. 本地文件存储（/kv、/assets，工程数据落盘 data/）
  *   2. 导演台桥（/events SSE、/director/*，工具调用分发给浏览器 executor）
  *   3. MCP 门面的后端（mcp.js 的 stdio 进程经 /director/tool 转发到桥）
  *
  * 端点：
- *   GET    /health              -> { ok, dataDir }
- *   GET    /bootstrap           -> { ok, name, version, protocolVersion }（web 端自动发现桥）
+ *   GET    /health              -> { ok, plugin, site, version, dataDir, protocolVersion }（插件壳 probeBridge 探测）
+ *   GET    /bootstrap           -> { ok, name, version, protocolVersion, url, token? }（web 端自动发现桥）
  *   GET    /kv                  -> { keys: [...] }
  *   GET    /kv/:key             -> 文本内容（404 = 无）
  *   PUT    /kv/:key             <- 文本内容
@@ -20,10 +20,15 @@
  *   POST   /director/result     <- { requestId, result | error }（query: clientId）
  *   GET    /director/status     -> executor 在线概况
  *   POST   /director/tool       <- { name, input, desk? } -> { ok, result } 或结构化错误
+ *
+ * 鉴权：除 /health、/bootstrap、/mcp、OPTIONS 预检与站点静态资源外，其余端点均需
+ * token（header x-director-token 或 query ?token=，SSE/<img> 等无法带自定义头的走 query）。
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
+import { promises as fsp } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, join, resolve, sep } from "node:path";
 
@@ -31,7 +36,7 @@ import { DirectorBridge, ToolError } from "./bridge.js";
 import { handleMethod as handleMcpMethod } from "./mcp.js";
 import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
-const PORT = Number(process.env.STORE_PORT || 17372);
+const PORT = Number(process.env.STORE_PORT || 17383);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
 const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "data"));
 
@@ -49,6 +54,75 @@ const SITE_CANDIDATES = [
 ].filter(Boolean).map((dir) => resolve(dir));
 const SITE_DIR = SITE_CANDIDATES.find((dir) => fs.existsSync(join(dir, "index.html"))) || "";
 
+// token 鉴权：启动时生成随机 token（DIRECTOR_BRIDGE_TOKEN 可固定，便于脚本/自测复用）。
+// 站点静态资源与探测端点公开，其余端点凭 header x-director-token 或 query ?token= 访问；
+// web 端经 /bootstrap 零配置领取（token 仅下发给本机回环来源，公网探测拿不到）。
+const TOKEN = process.env.DIRECTOR_BRIDGE_TOKEN?.trim() || crypto.randomBytes(18).toString("hex");
+const LOOPBACK_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+// vite 构建产物文件名含内容 hash，可永久缓存的扩展名集合
+const HASHED_ASSET_EXTS = new Set([".js", ".mjs", ".css", ".woff", ".woff2", ".ttf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".mp4", ".webm"]);
+
+/** 校验请求的连接 token：header x-director-token 或 query ?token=。 */
+function validToken(req, url) {
+    const header = req.headers["x-director-token"];
+    return url.searchParams.get("token") === TOKEN || header === TOKEN;
+}
+
+/** 解析站点请求对应的真实文件；未命中返回 ""（含越界防护，spaFallback=false 只命中真实文件）。 */
+async function resolveSiteFile(pathname, spaFallback = true) {
+    const relative = pathname.replace(/^\/+/, "") || "index.html";
+    const file = resolve(SITE_DIR, relative);
+    if (!file.startsWith(SITE_DIR + sep)) return ""; // 拒绝越界路径
+    try {
+        const stat = await fsp.stat(file);
+        if (!stat.isDirectory()) return file;
+    } catch {
+        // 文件不存在，走 SPA 回退
+    }
+    if (!spaFallback) return "";
+    // SPA 回退：无扩展名的路径交给 index.html（react-router 前端路由）
+    const last = relative.split("/").pop() || "";
+    if (last.includes(".")) return "";
+    const index = join(SITE_DIR, "index.html");
+    try {
+        await fsp.access(index);
+        return index;
+    } catch {
+        return "";
+    }
+}
+
+/**
+ * 缓存策略：/assets/ 下的 vite 哈希产物按内容 hash 永久缓存；local-assets/ 小时级；
+ * index.html 与 SPA 回退 no-store，保证发版即生效。passthrough=true（/assets 存储键
+ * 穿透分支）不加 immutable：存储键可能随时被覆盖/删除，长缓存会骗过应用的资源刷新判断。
+ */
+function cacheControlFor(pathname, passthrough = false) {
+    if (pathname.startsWith("/assets/") && HASHED_ASSET_EXTS.has(extname(pathname).toLowerCase())) {
+        return passthrough ? "public, max-age=3600" : "public, max-age=31536000, immutable";
+    }
+    if (pathname.startsWith("/local-assets/")) return "public, max-age=3600";
+    return "no-store";
+}
+
+/**
+ * token 豁免判定：探测端点（/health、/bootstrap、/mcp）、OPTIONS 与站点静态请求。
+ * 站点公开、API 鉴权（与插件壳 probeBridge / iframe 资源加载同口径）。SPA 回退只豁免
+ * 非 API 前缀且浏览器导航（Accept: text/html）的路径，/kv、/events 等接口仍需 token。
+ */
+async function tokenExempt(req, pathname) {
+    const segments = pathname.split("/").filter(Boolean);
+    const first = segments[0] || "";
+    if (["health", "bootstrap", "mcp"].includes(first)) return true;
+    if (!SITE_DIR || (req.method !== "GET" && req.method !== "HEAD")) return false;
+    // 站点真实文件公开（vite 产物、local-assets 模型、图标/配置等静态资源）
+    if (await resolveSiteFile(pathname, false)) return true;
+    // API 前缀（/events、/director/*、/kv、/assets、/skills）不做 SPA 回退豁免
+    if (["events", "director", "kv", "assets", "skills"].includes(first)) return false;
+    const last = segments[segments.length - 1] || "";
+    return !last.includes(".") && String(req.headers.accept || "").includes("text/html") && Boolean(await resolveSiteFile(pathname, true));
+}
+
 const MIME_TYPES = {
     ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8",
@@ -59,30 +133,27 @@ const MIME_TYPES = {
 };
 
 /**
- * 按站点静态规则响应；返回 true 表示已处理，false 表示未处理、调用方继续走后续路由。
- * spaFallback=false 时只命中真实存在的文件（存储 /assets 穿透用，避免把“键不存在”
- * 伪装成 200 的 index.html 骗过应用的资源加载判断）。
+ * 按站点静态规则响应（异步读取 + 流式发送，避免阻塞事件循环）；返回 true 表示已处理，
+ * false 表示未处理、调用方继续走后续路由。spaFallback=false 时只命中真实存在的文件
+ * （存储 /assets 穿透用，避免把“键不存在”伪装成 200 的 index.html 骗过应用的资源加载判断）；
+ * passthrough=true 时缓存头降级（不加 immutable，见 cacheControlFor）。
  */
-function serveSite(req, res, pathname, spaFallback = true) {
+async function serveSite(req, res, pathname, spaFallback = true, passthrough = false) {
     if (!SITE_DIR || (req.method !== "GET" && req.method !== "HEAD")) return false;
-    const relative = pathname.replace(/^\/+/, "") || "index.html";
-    const file = resolve(SITE_DIR, relative);
-    if (!file.startsWith(SITE_DIR + sep)) return false; // 拒绝越界路径
-    let target = file;
-    if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
-        // SPA 回退：无扩展名的路径交给 index.html（react-router 前端路由）
-        const last = relative.split("/").pop() || "";
-        if (!spaFallback || last.includes(".")) return false;
-        target = join(SITE_DIR, "index.html");
-        if (!fs.existsSync(target)) return false;
-    }
-    const headers = { "content-type": MIME_TYPES[extname(target).toLowerCase()] || "application/octet-stream" };
-    if (target.endsWith("index.html")) headers["cache-control"] = "no-store";
+    const target = await resolveSiteFile(pathname, spaFallback);
+    if (!target) return false;
+    const headers = {
+        "content-type": MIME_TYPES[extname(target).toLowerCase()] || "application/octet-stream",
+        "cache-control": cacheControlFor(pathname, passthrough),
+    };
     if (req.method === "HEAD") {
-        headers["content-length"] = String(fs.statSync(target).size);
+        headers["content-length"] = String((await fsp.stat(target)).size);
         send(res, 200, null, headers);
     } else {
-        send(res, 200, fs.readFileSync(target), headers);
+        res.writeHead(200, headers);
+        fs.createReadStream(target)
+            .on("error", () => res.end())
+            .pipe(res);
     }
     return true;
 }
@@ -131,7 +202,7 @@ const server = http.createServer(async (req, res) => {
     // 本机服务，全部放开 CORS，供不同端口的 dev server 页面访问
     res.setHeader("access-control-allow-origin", "*");
     res.setHeader("access-control-allow-methods", "GET, PUT, POST, DELETE, OPTIONS");
-    res.setHeader("access-control-allow-headers", "content-type, x-file-name");
+    res.setHeader("access-control-allow-headers", "content-type, x-file-name, x-director-token");
     if (req.method === "OPTIONS") return sendJson(res, 204, {});
 
     let url;
@@ -151,10 +222,39 @@ const server = http.createServer(async (req, res) => {
     const key = rest.length ? rest.join("/") : "";
 
     try {
-        if (group === "health") return sendJson(res, 200, { ok: true, dataDir: DATA_DIR });
+        // 插件壳 probeBridge 依赖的自描述信息：plugin 标识"端口上是不是我们的桥"，
+        // site 标识"有没有托管站点"，version/dataDir/protocolVersion 供壳层比对与展示。
+        if (group === "health") {
+            return sendJson(res, 200, {
+                ok: true,
+                plugin: "director-desk",
+                site: Boolean(SITE_DIR),
+                version: SERVER_VERSION,
+                dataDir: DATA_DIR,
+                protocolVersion: DIRECTOR_PROTOCOL_VERSION,
+            });
+        }
 
         if (group === "bootstrap") {
-            return sendJson(res, 200, { ok: true, name: SERVER_NAME, version: SERVER_VERSION, protocolVersion: DIRECTOR_PROTOCOL_VERSION });
+            // 零配置发现：web 端由此拿桥地址与 token。token 仅下发给无 Origin 的本机脚本
+            // 或回环 Origin 页面；跨站探测（公网网页 fetch 回环端口）返回不带 token 的 200，保持探测友好。
+            const origin = req.headers.origin || "";
+            const includeToken = !origin || LOOPBACK_ORIGIN.test(origin);
+            return sendJson(res, 200, {
+                ok: true,
+                name: SERVER_NAME,
+                version: SERVER_VERSION,
+                protocolVersion: DIRECTOR_PROTOCOL_VERSION,
+                url: `http://127.0.0.1:${PORT}`,
+                ...(includeToken ? { token: TOKEN } : {}),
+            });
+        }
+
+        // token 鉴权中间件：豁免之外的全部端点（/events、/director/*、/kv、/assets、/skills…）
+        // 未通过则 401。鉴权在响应头写出前完成；SSE（EventSource 不带自定义头）与 <img>
+        // 等 web 端用 query 形式（?token=），见 validToken。
+        if (!(await tokenExempt(req, pathname)) && !validToken(req, url)) {
+            return sendJson(res, 401, { ok: false, error: "invalid token" });
         }
 
         if (group === "events" && req.method === "GET") return bridge.openEvents(url, res);
@@ -266,8 +366,8 @@ const server = http.createServer(async (req, res) => {
             if (req.method === "GET" || req.method === "HEAD") {
                 const bin = join(dir, `${base}.bin`);
                 if (!fs.existsSync(bin)) {
-                    // 存储键缺失时只允许精确文件穿透（vite 的 /assets/*.js|css 与存储键共用 /assets 前缀）
-                    if (serveSite(req, res, pathname, false)) return;
+                    // 存储键缺失时只允许精确文件穿透（vite 的 /assets/*.js|css 与存储键共用 /assets 前缀）；穿透分支缓存头降级
+                    if (await serveSite(req, res, pathname, false, true)) return;
                     return sendJson(res, 404, { ok: false, error: "not found" });
                 }
                 let mimeType = "application/octet-stream";
@@ -289,7 +389,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         // 站点静态兜底（阶段二）：未匹配任何 API/桥路由的 GET 交给导演台 Web 应用
-        if (serveSite(req, res, pathname)) return;
+        if (await serveSite(req, res, pathname)) return;
 
         return sendJson(res, 404, { ok: false, error: "not found" });
     } catch (error) {

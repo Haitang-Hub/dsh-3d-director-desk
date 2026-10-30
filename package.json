@@ -1,6 +1,6 @@
 {
   "name": "dsh-3d-director-desk",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "3D 导演台右侧栏插件：画布与对话并排，Agent 经 director-desk 工具实时编排场景。",
   "type": "module",
   "main": "./dsh/index.js",
@@ -19,13 +19,15 @@
     "README.md"
   ],
   "scripts": {
-    "pack": "npm pack"
+    "sync": "node scripts/sync-assets.mjs",
+    "pack:all": "npm run sync && npm pack"
   },
   "license": "MIT",
   "author": "Haitang-Hub",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Haitang-Hub/dsh-3d-director-desk.git"
+    "url": "git+https://github.com/Haitang-Hub/dsh-3d-director-desk.git",
+    "directory": "dsh-plugin"
   },
   "keywords": [
     "dsh-plugin",

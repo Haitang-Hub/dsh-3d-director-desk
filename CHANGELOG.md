@@ -1,6 +1,10 @@
 # CHANGELOG
 
 ## Unreleased
++ [变更] 开发态桥端口 17372→17383（director-mcp 默认值、mcp.js BRIDGE_URL、selftest、web 端 local-store/use-director-agent-bridge 回退值、start 脚本同步），与 Desktop 插件桥的 17372 永久错开；开发态直启不再抢占插件桥端口（插件托管总显式传 STORE_PORT=17372，不受影响）。
++ [修复] 插件 0.3.4（版本线与 main 提根分支统一）：「重启服务」在心跳探测进行中静默失效——starting 窗口内的强制重建请求改记入 restartPending，本次探测结束后补一次重建；probeBridge 改以 /health 自报的 plugin/site 为判据（旧版桥回退 `GET /` 含 id="root" 判据），并区分「开发态导演台桥占用」与无关进程的报错文案；MCP 重连上限 120 次（约 10 分钟）放宽到近似无限（5s 退避 ×86400），避免长会话中工具静默失效；面板 iframe/新窗口地址改用 bridge-info 下发的 host，不再写死 127.0.0.1；面板轮询与心跳统一 8s。
++ [安全] 桥补齐鉴权（对齐 dsh-infinite-canvas 形态）：启动生成随机 token（DIRECTOR_BRIDGE_TOKEN 可覆盖），/bootstrap 仅向回环 Origin 下发 token，/events、/director/*、/kv、/assets、/skills 等数据端点一律要求 x-director-token 或 ?token=（/health、/bootstrap、/mcp 与静态站点豁免）；web 端 local-store 与 Agent 桥接改经 /bootstrap 零配置发现并自动携带 token；serveSite 异步化并为 vite 哈希产物加 immutable 缓存头；executor_offline 提示与 MCP_INSTRUCTIONS 中残留的 localhost:5080 全部改为桥实际地址；sync-assets 缺 web/dist 时硬失败（--skip-site 显式跳过）。
++ [文档] dsh-plugin README 移除未实现的 session-ownership 路由描述；新增 SHELL-SYNC.md（与画布插件的壳同步清单）与 check-shell-parity.mjs 壳漂移校验脚本。
 + [修复] 极窄面板（≤600px）顶栏 AI 助手改为纯图标，避免文字被挤成两行；601-920px 保留文字形态且不再被压缩换行。
 + [调整] AI 助手拖动时的吸附预览遮罩改为与松手后停靠面板同尺寸的幽灵预览（全高、随停靠宽度），不再是 10px 细条。
 + [修复] 窄面板顶栏不再隐藏右侧控件：AI 助手与模型配置在 421-920px 保留「AI 助手」文字形态，≤420px 收为图标；顺带修复 motion-workspace 样式把右侧 AI 按钮在 ≤600px 强制图标态导致文字被裁的问题。

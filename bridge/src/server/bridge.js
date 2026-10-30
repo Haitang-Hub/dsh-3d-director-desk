@@ -13,6 +13,9 @@ import { DIRECTOR_PROTOCOL_VERSION } from "../protocol.js";
 
 const HEARTBEAT_MS = 15_000;
 const AUDIT_SUMMARY_MAX = 500;
+// 桥监听端口（与 http.js 同口径）：站点由桥托管，executor 页面地址随端口动态拼出
+const PORT = Number(process.env.STORE_PORT || 17383);
+const HOST = process.env.STORE_HOST || "127.0.0.1";
 
 /** 带结构化码的工具调用错误：HTTP/MCP 门面按此序列化给 harness。 */
 export class ToolError extends Error {
@@ -119,7 +122,7 @@ export class DirectorBridge {
             const error = new ToolError(
                 "导演台 executor 离线",
                 "executor_offline",
-                "请先打开 3D 导演台页面 http://localhost:5080 并进入一个导演台编辑器",
+                `请先打开 3D 导演台页面 http://${HOST}:${PORT} 并进入一个导演台编辑器`,
             );
             await this.audit(name, deskId, input, Date.now() - startedAt, error);
             throw error;
