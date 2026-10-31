@@ -2,6 +2,11 @@
 
 ## Unreleased
 
++ [变更] 开发态桥端口 17372→17383（director-mcp 默认值、mcp.js BRIDGE_URL、selftest、web 端 local-store/use-director-agent-bridge 回退值、start 脚本同步），与 Desktop 插件桥的 17372 永久错开；开发态直启不再抢占插件桥端口（插件托管总显式传 STORE_PORT=17372，不受影响）。
++ [修复] 插件 0.3.4（版本线与 main 提根分支统一）：「重启服务」在心跳探测进行中静默失效——starting 窗口内的强制重建请求改记入 restartPending，本次探测结束后补一次重建；probeBridge 改以 /health 自报的 plugin/site 为判据（旧版桥回退 `GET /` 含 id="root" 判据），并区分「开发态导演台桥占用」与无关进程的报错文案；MCP 重连上限 120 次（约 10 分钟）放宽到近似无限（5s 退避 ×86400），避免长会话中工具静默失效；面板 iframe/新窗口地址改用 bridge-info 下发的 host，不再写死 127.0.0.1；面板轮询与心跳统一 8s。
++ [安全] 桥补齐鉴权（对齐 dsh-infinite-canvas 形态）：启动生成随机 token（DIRECTOR_BRIDGE_TOKEN 可覆盖），/bootstrap 仅向回环 Origin 下发 token，/events、/director/*、/kv、/assets、/skills 等数据端点一律要求 x-director-token 或 ?token=（/health、/bootstrap、/mcp 与静态站点豁免）；web 端 local-store 与 Agent 桥接改经 /bootstrap 零配置发现并自动携带 token。
++ [新增] 桥 /health 增加 plugin/site/version/dataDir 字段（插件站点能力探测单点判据）；serveSite 异步化并为 vite 哈希产物加 immutable 缓存头（index.html no-store）；executor_offline 提示与 MCP_INSTRUCTIONS 中残留的 localhost:5080 全部改为桥实际地址；sync-assets 缺 web/dist 时硬失败（--skip-site 显式跳过）。
++ [文档] dsh-plugin README 移除未实现的 session-ownership 路由描述；新增 SHELL-SYNC.md（与画布插件的壳同步清单）与 check-shell-parity.mjs 壳漂移校验脚本。
 + [修复] 导演台产物写回通道从未注册：c6bccde 只在 Agent 面板导入了 setDirectorHostApplyOps 但没有调用，导出渲染成功后写回必报「宿主画布未就绪」；现已在面板挂载时注册 applyOps 回调，截图与预演视频可正常写回画布并连线到导演台节点（已在真实画布上端到端验证）。
 + [修复] 导演台截图/预演视频写回画布持续失败的问题：画布上存在历史形态的导演台节点（type 为 text、仅靠 nodeType 或 metadata.directorDeskId 标识）时，stage_open 找不到来源节点导致导出窗口缺少 fromNode 参数，每次导出都报「写回画布失败」；现在节点匹配兼容该形态，且写回端在 fromNode 缺失时按导演台实例 ID 反查来源节点兜底。
 + [调整] 补齐画布 Agent 的导演台工具引导：canvas_create_node 说明支持 director 节点（自动绑定导演台实例）、stage_open 提示画布上没有导演台时先创建再打开，并在姿势与运镜预设说明中列出双膝跪（kneel-two）和群友预设（环绕摇臂降镜/升镜、过肩绕正面等），Agent 可从零完成「建导演台→摆角色道具→设姿势→应用运镜→截图和预演视频写回画布」全流程。

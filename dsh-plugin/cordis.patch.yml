@@ -1,5 +1,5 @@
 # 插件树插入项：
-# 1. 本工作台服务端入口（拉起 director-mcp 桥进程、暴露 bridge-info / session-ownership）
+# 1. 本工作台服务端入口（拉起 director-mcp 桥进程、暴露 bridge-info / restart-bridge）
 # 2. dsh-mcp-client 条目：把桥的 /mcp HTTP 门面注册为 mcp__director-desk__* 工具
 #
 # 端口单一事实来源：DIRECTOR_DESK_PORT（默认 17372）。本文件与 dsh/index.js 的
@@ -18,8 +18,9 @@
         url: !!js '"http://127.0.0.1:" + (process.env.DIRECTOR_DESK_PORT ?? "17372") + "/mcp"'
         toolCallTimeoutMs: 600000
         # 桥由本插件在 apply 里异步拉起，首次连接可能早于 /health 就绪；
-        # 默认 10 次退避在本机重启桥时太短，放宽到约 10 分钟持续重连。
+        # 与 dsh-infinite-canvas 同口径：近似无限重连（5s 退避 × 86400 次 ≈ 6 天），
+        # 避免长会话中重连耗尽后面板显示已连接而 mcp__* 工具静默失效。
         reconnect:
           initialDelayMs: 500
           maxDelayMs: 5000
-          maxAttempts: 120
+          maxAttempts: 86400

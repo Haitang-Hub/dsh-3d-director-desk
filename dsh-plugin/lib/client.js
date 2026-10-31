@@ -77,7 +77,12 @@ window.__ModuleLoader__.load({
       return info.ready ? '导演台已连接' : '导演台未就绪'
     }
 
-    /** 轮询本地桥状态；失败时降级，并把原因留给占位文案。 */
+    /** 桥 origin：host 由 bridge-info 下发（默认 127.0.0.1），不要写死。 */
+    function bridgeOrigin(info) {
+      return `http://${info?.host || '127.0.0.1'}:${info?.port}`
+    }
+
+    /** 轮询本地桥状态；失败时降级，并把原因留给占位文案。与服务端 8s 心跳同节奏。 */
     function useBridgeInfo() {
       const [info, setInfo] = useState(undefined)
       useEffect(() => {
@@ -87,7 +92,7 @@ window.__ModuleLoader__.load({
           .then(data => { if (alive) setInfo(data) })
           .catch(() => { if (alive) setInfo({ ready: false, error: 'bridge-info unreachable' }) })
         load()
-        const timer = setInterval(load, 5000)
+        const timer = setInterval(load, 8000)
         return () => { alive = false; clearInterval(timer) }
       }, [])
       return info
@@ -119,7 +124,7 @@ window.__ModuleLoader__.load({
       }
 
       const openExternal = () => {
-        if (info?.port) window.open(`http://127.0.0.1:${info.port}/`, '_blank', 'noopener')
+        if (info?.port) window.open(`${bridgeOrigin(info)}/`, '_blank', 'noopener')
       }
 
       return h('div', { style: SHELL_STYLE },
@@ -151,7 +156,7 @@ window.__ModuleLoader__.load({
         info?.ready
           ? h('iframe', {
             key: `${instanceId || 'root'}#${nonce}`,
-            src: `http://127.0.0.1:${info.port}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`,
+            src: `${bridgeOrigin(info)}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`,
             title: '3D 导演台',
             style: IFRAME_STYLE,
             'data-dsh-no-drag': '',

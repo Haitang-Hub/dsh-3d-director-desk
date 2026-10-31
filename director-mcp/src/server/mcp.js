@@ -3,7 +3,7 @@
  * 只实现 initialize / tools/list / tools/call / ping 四个方法 —— 工具面固定、协议子集小；
  * 若 harness 要求 progress notification 等完整能力，再切换到 @modelcontextprotocol/sdk。
  *
- * 工具执行不在本进程：POST 到常驻桥（17372 /director/tool），由桥路由给浏览器 executor。
+ * 工具执行不在本进程：POST 到常驻桥（开发态 17383 /director/tool），由桥路由给浏览器 executor。
  * stdin/stdout 只跑 JSON-RPC，日志一律走 stderr。
  */
 
@@ -11,7 +11,7 @@ import { mcpToolList } from "../schema/tools.js";
 import { SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-const BRIDGE_URL = (process.env.DIRECTOR_BRIDGE_URL || "http://127.0.0.1:17372").replace(/\/$/, "");
+const BRIDGE_URL = (process.env.DIRECTOR_BRIDGE_URL || "http://127.0.0.1:17383").replace(/\/$/, "");
 const DESK = process.env.DIRECTOR_DESK || "";
 
 /** 启动 stdio MCP 服务。 */
@@ -140,6 +140,6 @@ function log(text) {
 const MCP_INSTRUCTIONS = [
     "director-desk：3D 导演台的 MCP 服务。通过 stage_* 摆场景、camera_* 设运镜、preview_* 出图/出片。",
     "推荐工作流：stage_list_presets 查可用预设 → stage_place_character/stage_place_prop 摆场 → camera_set_pose + camera_set_keyframe 或 camera_apply_preset 设运镜 → preview_render_frame 看构图 → preview_export_animatic 出片。",
-    "渲染/导出类工具（preview_*）需要导演台页面在浏览器中打开（http://localhost:5080）；离线时会返回 executor_offline。",
+    `渲染/导出类工具（preview_*）需要导演台页面在浏览器中打开（${BRIDGE_URL}）；离线时会返回 executor_offline。`,
     "破坏性工具（stage_clear_scene、stage_remove_object、camera_delete_keyframe）调用前先 stage_get_state 确认现状。",
 ].join("\n");

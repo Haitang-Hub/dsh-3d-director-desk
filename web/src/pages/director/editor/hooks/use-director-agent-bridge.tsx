@@ -72,8 +72,8 @@ export type DirectorToolInput = {
 const DIRECTOR_AGENT_PROTOCOL_VERSION = 7;
 /** 桥实现版本：服务端在多个导演台页面同时连接时优先路由到最新版本。 */
 const DIRECTOR_BRIDGE_VERSION = 8;
-/** 本项目自有桥（director-mcp，端口 17372）的默认地址；自动发现失败即保持纯前端可用。 */
-export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17372";
+/** 本项目自有桥（director-mcp 开发态 17383，插件形态 17372）的默认地址；自动发现失败即保持纯前端可用。 */
+export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17383";
 
 /** 解析桥连接：显式配置（新键名，兼容读旧 canvas-agent 键）优先，否则探测本机 director-mcp。 */
 async function resolveDirectorBridge(): Promise<{ endpoint: string; token: string } | null> {
@@ -85,7 +85,11 @@ async function resolveDirectorBridge(): Promise<{ endpoint: string; token: strin
         const timer = window.setTimeout(() => controller.abort(), 1500);
         const res = await fetch(`${DIRECTOR_BRIDGE_DEFAULT_ENDPOINT}/bootstrap`, { signal: controller.signal });
         window.clearTimeout(timer);
-        if (res.ok) return { endpoint: DIRECTOR_BRIDGE_DEFAULT_ENDPOINT, token: storedToken };
+        if (res.ok) {
+            // 桥启用 token 鉴权后，token 随 /bootstrap 下发（回环来源），SSE 与 /director/* 请求靠它过中间件
+            const body = (await res.json().catch(() => ({}))) as { token?: string };
+            return { endpoint: DIRECTOR_BRIDGE_DEFAULT_ENDPOINT, token: body.token || storedToken };
+        }
     } catch {
         // 桥未启动：保持纯前端可用，静默跳过
     }
