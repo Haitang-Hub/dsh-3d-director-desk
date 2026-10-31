@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write
 
+# Configure the NPM_TOKEN repo secret to enable npm publishing; without it
+# the publish step is skipped and releases still land on main + GitHub Release.
+env:
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
 concurrency:
   group: release
   cancel-in-progress: false
@@ -109,3 +114,15 @@ jobs:
           generate_release_notes: true
           files: dsh-plugin/dsh-3d-director-desk-*.tgz
           fail_on_unmatched_files: true
+
+      # Skipped unless the NPM_TOKEN secret is configured. npm-based plugin
+      # markets discover packages by the "dsh-plugin" keyword (already set in
+      # dsh-plugin/package.json).
+      - name: Publish to npm
+        if: steps.gate.outputs.needed == 'true' && env.NPM_TOKEN != ''
+        working-directory: dsh-plugin
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > ~/.npmrc
+          npm publish
