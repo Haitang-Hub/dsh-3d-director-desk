@@ -64,7 +64,7 @@ async function runDoctor() {
         const status = await getJson(`${BRIDGE_URL}/director/status`);
         const ready = (status?.body?.executors || []).filter((item) => item.ready);
         if (ready.length) pass(`executor 在线 ${ready.length} 个：${ready.map((item) => item.deskId || "(未指定 desk)").join(", ")}`);
-        else fail("没有已就绪的导演台页面 —— 打开 http://localhost:5080 并进入一个导演台编辑器后重试");
+        else fail("没有已就绪的导演台页面 —— 打开 http://127.0.0.1:17372 并进入一个导演台编辑器后重试");
     }
 
     try {

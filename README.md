@@ -1,7 +1,8 @@
 # dsh-3d-director-desk（DSH Desktop 插件包）
 
 把 3D 导演台接入 DeepSeek Harness（DSH Desktop）的插件包。本仓库就是插件包本身：
-`npm pack` 直接出可安装的 `.tgz`，`bridge/` 与 `site/` 产物已入库，克隆即打包，无需构建。
+`npm pack` 直接出可安装的 `.tgz`。main 分支 `bridge/` 与 `site/` 产物已入库，克隆即打包；
+full 分支（全量源码）上这两目录由 `npm run sync` 生成（gitignore 排除），先 build 再打包。
 
 一个包同时是：
 
@@ -43,7 +44,7 @@ executor = 右侧栏「导演台」标签 iframe 里的导演台编辑器（用�
 （仓库根 = 插件包根）
 ├── package.json          # npm 与 dsh.bundle.patch / dsh.client 声明
 ├── cordis.patch.yml      # 工作台条目 + dsh-mcp-client 条目
-├── dsh/index.js          # 服务端入口：拉起桥 + bridge-info / session-ownership + 健康检查
+├── dsh/index.js          # 服务端入口：拉起桥 + bridge-info / restart-bridge + 8s 心跳守护
 ├── lib/client.js         # 客户端单文件（右侧栏「导演台」标签：引导入口 + 快捷操作 + iframe）
 ├── bridge/               # 桥运行时（director-mcp 快照，已入库）
 ├── site/                 # 导演台前端构建产物（web/dist 快照，含本地 3D 资产库，已入库）
@@ -73,13 +74,34 @@ cd dsh-3d-director-desk && npm pack    # 产出 .tgz，再按上行安装
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /api/director-desk.bridge-info` | `{ ready, host, port, error? }`，标签页据此决定显示 iframe 还是离线引导 |
-| `GET /api/director-desk.session-ownership` | 转述宿主只读服务 `desktopWorkbenchOwnership`：`{ ok, revision, installed, sessions }`；宿主未提供该服务时 503 |
+| `GET /api/director-desk.bridge-info` | `{ ready, host, port, supervised, restarts, error? }`，标签页据此决定显示 iframe 还是离线引导 |
+| `POST /api/director-desk.restart-bridge` | 强制杀掉插件托管的桥子进程并重建，面板「重启服务」按钮用 |
 | `sidebarRightTabs.register({ id, kind, title, guide })` | 声明「导演台」标签类型，并在右侧栏「开始」引导页放入口 |
 | `slots.register({ name: 'sidebar.right.pane.tab', key })` | 标签正文：快捷操作行 + 导演台 iframe |
 
-会话归属：服务端用 `ctx.get('desktopWorkbenchOwnership')` **现查**（不写进 `inject`，
-服务缺失时不能让标签激活失败）。右侧栏形态下会话由宿主直接渲染，插件不自建聊天界面。
+右侧栏形态下会话由宿主直接渲染，插件不自建聊天界面。
+
+## 发布（CI/CD）
+
+发布由 GitHub Actions 全自动完成，本地只需三步：
+
+1. 改 `dsh-plugin/package.json` 的 `version`；
+2. 在 `CHANGELOG.md` 补一节变更记录；
+3. 提交并推送 `full` 分支。
+
+推送后两条流水线并行工作（`.github/workflows/`）：
+
+- **CI**：每次 push / PR 到 `full` 都会跑 `web` 的 typecheck + build 和 `dsh-plugin sync`，不发布；
+- **Release**：读取 `dsh-plugin/package.json` 的版本号，若远端不存在 `v<版本>` tag 则自动构建、把
+  `dsh/ lib/ bridge/ site/ cordis.patch.yml package.json` 同步到 main 分支根目录、打 tag 并创建
+  GitHub Release（附 `.tgz`，见 Releases 页）。版本号没变时只跑 CI，不会重复发版。
+
+发布产物下载：
+
+```bash
+# GitHub Releases 页下载 dsh-3d-director-desk-<版本>.tgz 后：
+dsh plugin --profile web add /绝对路径/dsh-3d-director-desk-<版本>.tgz
+```
 
 ## 全量版本（可找回）
 
@@ -104,8 +126,9 @@ git switch full          # full 分支（= full-v1.0 tag），全量布局
 | 包格式（第 3 节必须项） | 已实现：`dsh.bundle.patch` / `dsh.client.platform` / `dsh.client.inject` / `exports["./client"]` / 官方包仅在 peerDependencies |
 | 服务端拉起桥 + bridge-info | 已实现；路由纳入 `ctx.effect`；复用前校验站点能力，不可用则报出可操作原因 |
 | 面板形态 | DSH 右侧栏标签：与会话并排的「导演台」标签页（`dsh.client.inject` = `@deepseek-ai/dsh-client-ui-sidebar-right`） |
-| 会话归属 | 只读查询已接（`/api/director-desk.session-ownership`）；右侧栏下会话由宿主渲染，插件不自建聊天 |
-| MCP 工具注册（streamable-http） | 配置已写；`reconnect` 放宽到约 10 分钟，桥晚于 Harness 就绪也能接上 |
+| 会话归属 | 右侧栏下会话由宿主渲染，插件不自建聊天（session-ownership 接口未实现，README 早期版本误标为已接） |
+| 桥鉴权 | 已实现：/bootstrap 仅向回环 Origin 下发随机 token，数据端点要求 `x-director-token` 或 `?token=`；/health、/mcp 与静态站点豁免 |
+| MCP 工具注册（streamable-http） | 配置已写；`reconnect` 放宽到近似无限（5s 退避 ×86400），桥晚于 Harness 就绪也能接上 |
 | 桥伺服站点 + 标签 iframe | 已实现：显式 `DIRECTOR_SITE_DIR`，静态优先、无扩展名路径回退 index.html |
 | iframe 内建 AI 助手 | 仍存在（页面直连模型配置），与原生会话并存；后续收敛到只保留一条 |
 | 已知限制 | 端口/包更新需重启；17372 若被全量版 start.bat 起的桥占用，插件会复用它（数据落在仓库 `data/`） |
