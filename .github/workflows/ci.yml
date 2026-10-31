@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [full]
+  pull_request:
+    branches: [full]
+
+jobs:
+  build:
+    name: typecheck / build / sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # antd 6 conflicts with pro-components beta peer range
+      - name: Install web dependencies
+        working-directory: web
+        run: npm install --legacy-peer-deps
+
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build web
+        working-directory: web
+        run: npm run build
+
+      # sync-assets.mjs fails hard if web/dist is missing, so this
+      # also proves the full build chain (director-mcp -> bridge, dist -> site)
+      - name: Sync plugin assets
+        working-directory: dsh-plugin
+        run: npm run sync
+
+      - name: Upload web dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 7
+          if-no-files-found: error
