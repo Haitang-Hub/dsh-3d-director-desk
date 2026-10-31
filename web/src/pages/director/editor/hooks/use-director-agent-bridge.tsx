@@ -452,7 +452,7 @@ export async function runDirectorTool(name: string, input: DirectorToolInput) {
             };
             // 独立使用（无来源画布）时默认不写回画布，直接返回产物摘要；显式 returnToCanvas=true 才在缺画布时报错。
             if (input.returnToCanvas !== true && !(await readImportTarget())) return summary;
-            const canvasNodeId = await appendFrameToCanvas(result.dataUrl, input.fileName || result.fileName);
+            const canvasNodeId = await appendFrameToCanvas(result.dataUrl);
             return canvasNodeId ? { ...summary, returnedToCanvas: true, canvasNodeId } : summary;
         }
         case "preview_export_animatic": {
@@ -545,10 +545,10 @@ async function appendAnimaticToCanvas(blob: Blob) {
 }
 
 /** 把当前视角截图写回来源画布并连线到导演台节点。 */
-async function appendFrameToCanvas(dataUrl: string, fileName: string) {
+async function appendFrameToCanvas(dataUrl: string) {
     const target = await readImportTarget();
     if (!target) throw new Error("写回画布失败：找不到来源画布或导演台节点，请从画布的导演台节点重新 stage_open 后再导出");
-    const uploaded = await uploadImage(dataUrl, { fileName });
+    const uploaded = await uploadImage(dataUrl);
     const node = { ...createCanvasNode(CanvasNodeType.Image, { x: 0, y: 0 }, imageMetadata(uploaded)), title: "导演台参考帧", id: "image-" + crypto.randomUUID() };
     const result = await requestHostApplyOps(target.projectId, buildCaptureOps(target, node as import("@/types/canvas").CanvasNodeData));
     return result.canvasNodeId || node.id;
