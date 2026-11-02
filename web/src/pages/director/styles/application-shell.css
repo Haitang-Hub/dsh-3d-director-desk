@@ -2093,9 +2093,49 @@
     --left-sidebar-width: min(218px, 29vw);
   }
 
-  /* 小屏保留顶栏右侧的 AI 助手与模型配置；右列按内容取宽避免压缩换行 */
+  /* 顶栏从 grid 换成 flex + space-between（覆盖基础 grid 布局）：
+     flex 项只会收缩、绝不互相骑压——grid 的居中列在负剩余空间时会向两侧
+     溢出，裁掉文件图标/AI 图标。空间不足时的让位顺序：名称收缩（省略号）→
+     隐藏帮助文档（≤480）→ 隐藏名称（≤420）→ 图标 26px + 视角文字两行（≤400）
+     → 兜底整体向右溢出（~300px 以下） */
   .app-shell .top-bar {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 中/右列定宽不收缩，收缩量全部由左列名称吸收 */
+  .app-shell .top-bar-center,
+  .app-shell .top-bar-right {
+    min-width: auto;
+    flex: 0 0 auto;
+  }
+
+  .app-shell .top-bar-left {
+    /* 显式下限 = 文件图标 32 + 胶囊内边距：flex 收缩全部落在名称上，
+       文件图标永不裁切。不能用 min-width:auto——自动最小宽度会取名称的
+       min-content 贡献（nowrap 文本全宽 ~85px），425-500px 区间挤爆顶栏 */
+    min-width: 40px;
+    overflow: hidden;
+    /* 放开基础规则的 max-width: calc(100% - 16px)：它会把胶囊再砍 16px，
+       裁掉定宽的文件图标 */
+    max-width: none;
+  }
+
+  /* 名称优先吃剩余宽度（省略号）。flex-basis 必须是 0 而非 auto：
+     basis auto 时名称按整段文本宽度参与收缩分配，极窄区间接连挤爆顶栏；
+     basis 0 + min-width 0 + overflow hidden 让它可平滑收缩到 0 */
+  .app-shell .top-bar-left .director-desk-name {
+    flex: 1 1 0%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 8px;
+  }
+
+  /* 文件/文档图标保持定宽不压缩（椭圆挤压），收缩量全部由名称吸收 */
+  .app-shell .top-bar-left .top-bar-icon-button {
+    flex-shrink: 0;
   }
 
   .app-shell .top-bar-right .top-bar-motion-button {
@@ -2111,7 +2151,31 @@
   }
 }
 
-@media (max-width: 600px) {
+/* 紧凑顶栏断点 680px：名称胶囊在 ~660px 起被中心/右簇完全挤没，
+   必须在那之前整体切换为紧凑布局（文件图标+名称、图标化按钮、工具条换行居中） */
+/* ============================================================
+   顶栏响应式规范（≤680 紧凑区）
+   ------------------------------------------------------------
+   所有按钮定宽（flex-shrink: 0），任何宽度下不压缩、不骑压、不遮挡。
+   布局为 flex + space-between（覆盖基础 grid）：flex 项只会收缩、绝不
+   互相骑压——grid 的居中列在负剩余空间时会向两侧溢出裁掉两侧图标。
+   空间不足时的让位顺序：
+   ① 名称收缩（省略号，可缩到 0）
+   ② 隐藏帮助文档（≤480，低频）
+   ③ 隐藏名称（≤420，再窄只剩残片）
+   ④ 视角文字两行（≤400，换行腾宽）
+   ⑤ 间距收紧 + 视角按钮 32px 两行（≤340）
+   ⑥ 兜底：整体向右溢出（~315px 以下才会发生）
+   图标恒定 32px，任何断点不缩小。
+
+   分档表现：
+   680-480  全量：文件/文档图标 + 名称 + 视角单行 + 32px 图标
+   480-420  隐藏帮助文档；视角按钮 12px 字号收窄；名称收缩
+   420-400  同上，名称隐藏
+   400-340  视角文字两行，图标 32px
+   ≤340     间距收紧、视角按钮 32px 两行；图标 32px；~315px 为布局下限
+   ============================================================ */
+@media (max-width: 680px) {
   .app-shell .top-bar {
     top: 8px;
     right: 8px;
@@ -2125,13 +2189,6 @@
   .app-shell .top-bar-right {
     height: 42px;
     padding: 4px;
-  }
-
-  /* 名称优先吃剩余宽度（省略号），不再被中心簇挤没 */
-  .app-shell .top-bar-left .director-desk-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 0 8px;
   }
 
   .app-shell .top-bar-actions {
@@ -2148,11 +2205,6 @@
     justify-content: center;
   }
 
-  /* 右列按内容取宽：AI 助手+模型配置不被 1fr 压缩，名称列自动收缩 */
-  .app-shell .top-bar {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
   .app-shell .top-bar-right .top-bar-motion-button {
     flex-shrink: 0;
     /* 覆盖 motion-workspace.css：极窄时右组 AI 助手只留图标，避免文字换行 */
@@ -2165,7 +2217,7 @@
     justify-content: center;
   }
 
-  /* 极窄时收起次要的视角手感/性能触发器，为右侧 AI 助手+模型配置让位 */
+  /* 收起次要的视角手感/性能触发器，为 AI 助手+模型配置让位 */
   .app-shell .viewport-sensitivity-trigger,
   .app-shell .performance-settings-trigger {
     display: none;
@@ -2175,14 +2227,11 @@
     width: auto;
   }
 
-  /* 极窄面板：隐藏工程目录/帮助图标，宽度让给导演台名称 */
-  .app-shell .top-bar-left .top-bar-icon-button {
-    display: none;
-  }
-
+  /* 视角按钮按内容取宽并禁止折行：68px 最小宽装不下四字文本，会折成两行 */
   .app-shell .mode-toggle-button {
     width: auto;
-    min-width: 68px;
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .app-shell .viewport-toolbar {
@@ -2196,11 +2245,64 @@
   }
 }
 
-@media (max-width: 420px) {
+/* ② ≤480px：隐藏低频的帮助文档，保留文件（工程目录）图标；视角按钮 12px 收窄 */
+@media (max-width: 480px) {
+  .app-shell .top-bar-left .top-bar-icon-button:nth-child(2) {
+    display: none;
+  }
+
   .app-shell .mode-toggle-button {
     min-width: 0;
     padding: 0 7px;
     font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+/* ③ ≤420px：名称可显示宽度不足 40px，收掉避免只剩残片 */
+@media (max-width: 420px) {
+  .app-shell .top-bar-left .director-desk-name {
+    display: none;
+  }
+}
+
+/* ④ ≤400px：视角文字换行（两行方形按钮）腾出宽度，图标保持 32px */
+@media (max-width: 400px) {
+  /* 视角文字换行（两行方形按钮）腾出宽度，保图标按钮不被压窄：
+     覆盖 ≤480 的 nowrap 与 motion-workspace 的 0 6px */
+  .app-shell .top-bar .mode-toggle .mode-toggle-button {
+    white-space: normal;
+    width: 36px;
+    min-width: 0;
+    padding: 0 2px;
+    line-height: 1.15;
+  }
+}
+
+/* ⑤ ≤340px：间距收紧 + 视角按钮更窄（32px 两行）。图标恒定 32px 绝不缩小；
+   ~315px 以下空间不足时整体向右溢出兜底 */
+@media (max-width: 340px) {
+  .app-shell .top-bar {
+    gap: 4px;
+  }
+
+  .app-shell .top-bar-center {
+    gap: 2px;
+  }
+
+  .app-shell .top-bar-right {
+    gap: 4px;
+  }
+
+  .app-shell .top-bar-left,
+  .app-shell .top-bar-center,
+  .app-shell .top-bar-right {
+    padding: 3px;
+  }
+
+  .app-shell .top-bar .mode-toggle .mode-toggle-button {
+    width: 32px;
+    padding: 0 1px;
   }
 }
 

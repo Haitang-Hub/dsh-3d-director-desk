@@ -107,6 +107,15 @@ function DirectorDeskNameField({ desks, activeDeskId, onChange }: { desks: Direc
   );
 }
 
+/** 打开帮助文档：独立浏览器用新标签页；harness 面板（iframe 内）时 _blank 弹窗会被宿主转交系统浏览器，改为当前面板内跳转。 */
+function openHelpDocs() {
+  if (window.self !== window.top) {
+    window.location.assign("/help");
+    return;
+  }
+  window.open("/help", "_blank", "noopener");
+}
+
 // 3D 导演台编辑器:全屏独立页面：全屏独立页面（不含无限画布顶部导航），URL 参数 instanceId 是导演台的唯一入口。
 export default function DirectorEditorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -235,7 +244,7 @@ export default function DirectorEditorPage() {
               <button className="top-bar-icon-button" type="button" title="工程目录（新建 / 导入 / 删除 / 切换）" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
                 <FolderOpen aria-hidden="true" size={15} />
               </button>
-              <button className="top-bar-icon-button" type="button" title="帮助文档（新窗口打开）" aria-label="打开帮助文档" onClick={() => window.open("/help", "_blank", "noopener")}>
+              <button className="top-bar-icon-button" type="button" title="帮助文档" aria-label="打开帮助文档" onClick={openHelpDocs}>
                 <BookOpen aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField

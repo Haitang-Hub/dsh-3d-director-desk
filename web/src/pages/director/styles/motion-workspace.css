@@ -560,7 +560,8 @@
   }
 }
 
-@media (max-width: 600px) {
+/* 与 application-shell 的紧凑顶栏断点保持一致（680px，见彼处说明） */
+@media (max-width: 680px) {
   .top-bar {
     grid-template-columns: minmax(0, 1fr) auto;
     min-height: 58px;
@@ -577,7 +578,8 @@
 
   .top-bar-left {
     gap: 4px;
-    overflow: hidden;
+    /* 不设 overflow: hidden：会让网格把左列压到 0，裁掉定宽的文件图标；
+       名称溢出由 .director-desk-name-text 自身的 ellipsis 处理 */
   }
 
   .top-bar-home-nav-button,
@@ -644,7 +646,8 @@
   .viewport-toolbar {
     bottom: 160px;
     max-width: calc(100% - 16px);
-    justify-content: flex-start;
+    /* 小屏工具条内容居中，与中屏的居中定位保持一致 */
+    justify-content: center;
     overflow-x: auto;
     overflow-y: hidden;
   }
