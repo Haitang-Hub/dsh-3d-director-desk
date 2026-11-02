@@ -81,6 +81,28 @@ cd dsh-3d-director-desk && npm pack    # 产出 .tgz，再按上行安装
 
 右侧栏形态下会话由宿主直接渲染，插件不自建聊天界面。
 
+## 发布（CI/CD）
+
+发布由 GitHub Actions 全自动完成，本地只需三步：
+
+1. 改 `dsh-plugin/package.json` 的 `version`；
+2. 在 `CHANGELOG.md` 补一节变更记录；
+3. 提交并推送 `full` 分支。
+
+推送后两条流水线并行工作（`.github/workflows/`）：
+
+- **CI**：每次 push / PR 到 `full` 都会跑 `web` 的 typecheck + build 和 `dsh-plugin sync`，不发布；
+- **Release**：读取 `dsh-plugin/package.json` 的版本号，若远端不存在 `v<版本>` tag 则自动构建、把
+  `dsh/ lib/ bridge/ site/ cordis.patch.yml package.json` 同步到 main 分支根目录、打 tag 并创建
+  GitHub Release（附 `.tgz`，见 Releases 页）。版本号没变时只跑 CI，不会重复发版。
+
+发布产物下载：
+
+```bash
+# GitHub Releases 页下载 dsh-3d-director-desk-<版本>.tgz 后：
+dsh plugin --profile web add /绝对路径/dsh-3d-director-desk-<版本>.tgz
+```
+
 ## 全量版本（可找回）
 
 历史上本项目是独立全量工程：`web/`（Vite + React + three.js 源码，端口 5080）、
