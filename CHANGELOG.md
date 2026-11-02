@@ -2,6 +2,10 @@
 
 ## Unreleased
 
++ [修复] 顶栏小屏响应式整体重构：≤920px 从 grid 换 flex + space-between，全部按钮定宽（flex-shrink: 0）、图标恒定 32px，任何宽度不压缩、不骑压、不遮挡；空间不足按「名称收缩 → 隐藏帮助文档(≤480) → 隐藏名称(≤420) → 视角文字两行(≤400) → 间距收紧(≤340) → 向右溢出兜底」顺序让位；视口工具条小屏改为第二行居中展示；附带修复名称胶囊 nowrap 文本把左列最小宽度撑到全宽导致 425-500px 挤爆顶栏的问题。
++ [修复] 帮助文档按钮在 harness 面板（iframe 内嵌）下改为当前面板内路由跳转——桌面 WebView 不支持应用内弹窗，`_blank` 会被宿主转交系统默认浏览器；独立浏览器环境保留新标签页打开。
++ [变更] 导入画布触发器新增 canvas-import-trigger 类名，便于响应式样式单独定位（与导出面板共用 export-trigger）。
+
 + [变更] 开发态桥端口 17372→17383（director-mcp 默认值、mcp.js BRIDGE_URL、selftest、web 端 local-store/use-director-agent-bridge 回退值、start 脚本同步），与 Desktop 插件桥的 17372 永久错开；开发态直启不再抢占插件桥端口（插件托管总显式传 STORE_PORT=17372，不受影响）。
 + [修复] 插件 0.3.4（版本线与 main 提根分支统一）：「重启服务」在心跳探测进行中静默失效——starting 窗口内的强制重建请求改记入 restartPending，本次探测结束后补一次重建；probeBridge 改以 /health 自报的 plugin/site 为判据（旧版桥回退 `GET /` 含 id="root" 判据），并区分「开发态导演台桥占用」与无关进程的报错文案；MCP 重连上限 120 次（约 10 分钟）放宽到近似无限（5s 退避 ×86400），避免长会话中工具静默失效；面板 iframe/新窗口地址改用 bridge-info 下发的 host，不再写死 127.0.0.1；面板轮询与心跳统一 8s。
 + [安全] 桥补齐鉴权（对齐 dsh-infinite-canvas 形态）：启动生成随机 token（DIRECTOR_BRIDGE_TOKEN 可覆盖），/bootstrap 仅向回环 Origin 下发 token，/events、/director/*、/kv、/assets、/skills 等数据端点一律要求 x-director-token 或 ?token=（/health、/bootstrap、/mcp 与静态站点豁免）；web 端 local-store 与 Agent 桥接改经 /bootstrap 零配置发现并自动携带 token。
