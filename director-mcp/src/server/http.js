@@ -117,8 +117,11 @@ async function tokenExempt(req, pathname) {
     if (!SITE_DIR || (req.method !== "GET" && req.method !== "HEAD")) return false;
     // 站点真实文件公开（vite 产物、local-assets 模型、图标/配置等静态资源）
     if (await resolveSiteFile(pathname, false)) return true;
-    // API 前缀（/events、/director/*、/kv、/assets、/skills）不做 SPA 回退豁免
-    if (["events", "director", "kv", "assets", "skills"].includes(first)) return false;
+    // API 前缀（/events、/kv、/assets、/skills）不做 SPA 回退豁免。注意 /director 不在
+    // 拉黑清单里：桥根本不伺服 /director/* API，/director/editor 是 web 端 BrowserRouter
+    // 的编辑器路由（iframe 直开深链），拉黑会让它落到 token 中间件拿 "invalid token"。
+    // 豁免仍有三重限制兜底：仅 GET/HEAD、仅浏览器导航（Accept: text/html）、仅非文件路径。
+    if (["events", "kv", "assets", "skills"].includes(first)) return false;
     const last = segments[segments.length - 1] || "";
     return !last.includes(".") && String(req.headers.accept || "").includes("text/html") && Boolean(await resolveSiteFile(pathname, true));
 }

@@ -9,4 +9,4 @@ export const DIRECTOR_PROTOCOL_VERSION = 7;
 /** MCP server 名，harness 据此区分 infinite-canvas / director-desk。 */
 export const SERVER_NAME = "director-desk";
 
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.1.1";

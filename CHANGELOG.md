@@ -2,6 +2,8 @@
 
 ## Unreleased
 
++ [修复] 桥 0.1.1：harness 内经画布节点「打开导演台」打开的右侧栏标签整体空白并显示 {"ok":false,"error":"invalid token"}——token 豁免清单误把 /director 前缀拉黑，而 /director/editor 正是 web 端 BrowserRouter 的编辑器路由（iframe 深链），落到 token 中间件被拒；移除该前缀（桥本就不伺服 /director/* API），豁免仍有 GET/HEAD、Accept: text/html、非文件路径三重限制兜底。
+
 + [修复] 顶栏小屏响应式整体重构：≤920px 从 grid 换 flex + space-between，全部按钮定宽（flex-shrink: 0）、图标恒定 32px，任何宽度不压缩、不骑压、不遮挡；空间不足按「名称收缩 → 隐藏帮助文档(≤480) → 隐藏名称(≤420) → 视角文字两行(≤400) → 间距收紧(≤340) → 向右溢出兜底」顺序让位；视口工具条小屏改为第二行居中展示；附带修复名称胶囊 nowrap 文本把左列最小宽度撑到全宽导致 425-500px 挤爆顶栏的问题。
 + [修复] 帮助文档按钮在 harness 面板（iframe 内嵌）下改为当前面板内路由跳转——桌面 WebView 不支持应用内弹窗，`_blank` 会被宿主转交系统默认浏览器；独立浏览器环境保留新标签页打开。
 + [变更] 导入画布触发器新增 canvas-import-trigger 类名，便于响应式样式单独定位（与导出面板共用 export-trigger）。
