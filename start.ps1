@@ -12,11 +12,18 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# --- port conflict warn (17383 dev mcp / 5080 web) ---
-foreach ($port in 17383, 5080) {
-    if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
-        Write-Host "[WARN] port $port is already in use, existing instance may be running" -ForegroundColor Yellow
-    }
+# 端口在听不代表是我们家的桥——curl /health 核对 plugin 身份字段，
+# 防止其它进程占着 17383 时仍盲目启动导致 EADDRINUSE。
+function Test-BridgeHealth([int]$Port, [string]$Plugin) {
+    try {
+        $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+        return [bool]($health.plugin -eq $Plugin)
+    } catch { return $false }
+}
+
+# --- port conflict warn (5080 web) ---
+if (Get-NetTCPConnection -LocalPort 5080 -State Listen -ErrorAction SilentlyContinue) {
+    Write-Host "[WARN] port 5080 is already in use, existing instance may be running" -ForegroundColor Yellow
 }
 
 # web needs --legacy-peer-deps: antd 6 conflicts with pro-components beta peer range
@@ -32,8 +39,16 @@ if (-not (Test-Path "$webDir/node_modules")) {
 Write-Host "Starting services..." -ForegroundColor Cyan
 
 # 1. director-mcp (dev port 17383; Desktop plugin bridge keeps 17372) - local storage + director bridge
-Start-Process cmd -ArgumentList '/k', 'title director-mcp 17383 && set STORE_PORT=17383&& node index.js' -WorkingDirectory $mcpDir
-Write-Host "  director-mcp started" -ForegroundColor Green
+if (Get-NetTCPConnection -LocalPort 17383 -State Listen -ErrorAction SilentlyContinue) {
+    if (Test-BridgeHealth 17383 "director-desk") {
+        Write-Host "  director-mcp 17383 already listening - reusing it" -ForegroundColor Green
+    } else {
+        Write-Host "[ERR] port 17383 is occupied by another service (not director-mcp) - bridge not started" -ForegroundColor Red
+    }
+} else {
+    Start-Process cmd -ArgumentList '/k', 'title director-mcp 17383 && set STORE_PORT=17383&& node index.js' -WorkingDirectory $mcpDir
+    Write-Host "  director-mcp started" -ForegroundColor Green
+}
 
 # 2. open browser once web dev server is up (delayed, non-blocking)
 Start-Process cmd -ArgumentList '/c', 'timeout /t 4 >nul && start http://localhost:5080' -WindowStyle Hidden

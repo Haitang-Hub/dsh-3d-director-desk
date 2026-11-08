@@ -72,43 +72,71 @@ export type DirectorToolInput = {
 const DIRECTOR_AGENT_PROTOCOL_VERSION = 7;
 /** 桥实现版本：服务端在多个导演台页面同时连接时优先路由到最新版本。 */
 const DIRECTOR_BRIDGE_VERSION = 8;
-/** 本项目自有桥（director-mcp 开发态 17383，插件形态 17372）的默认地址；自动发现失败即保持纯前端可用。 */
+/** 本项目自有桥（director-mcp 开发态 17383，插件形态 17372）的兜底地址；自动发现失败即保持纯前端可用。 */
 export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17383";
 
-/** 解析桥连接：显式配置（新键名，兼容读旧 canvas-agent 键）优先，否则探测本机 director-mcp。 */
-async function resolveDirectorBridge(): Promise<{ endpoint: string; token: string } | null> {
-    const storedEndpoint = (localStorage.getItem("director-bridge-url") || localStorage.getItem("canvas-agent-url") || "").replace(/\/$/, "");
-    const storedToken = localStorage.getItem("director-bridge-token") || localStorage.getItem("canvas-agent-token") || "";
-    if (storedEndpoint && storedToken) return { endpoint: storedEndpoint, token: storedToken };
+/** 桥端点候选：同源优先（插件形态桥自伺服页面 / dev 态 vite 代理到 17383），其次本机固定端口。 */
+function directorBridgeCandidates(): string[] {
+    const candidates: string[] = [];
+    try {
+        const { protocol, hostname } = window.location;
+        if ((protocol === "http:" || protocol === "https:") && (hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]")) {
+            candidates.push(window.location.origin);
+        }
+    } catch {
+        // 非浏览器环境（SSR/测试）忽略同源候选。
+    }
+    if (!candidates.includes(DIRECTOR_BRIDGE_DEFAULT_ENDPOINT)) candidates.push(DIRECTOR_BRIDGE_DEFAULT_ENDPOINT);
+    return candidates;
+}
+
+/** 向候选端点请求 /bootstrap 领 token（回环来源才下发），只认自家桥：响应带 name 时必须匹配（缺字段视为旧版桥放行）。 */
+async function fetchDirectorBootstrap(candidate: string, fallbackToken: string): Promise<{ endpoint: string; token: string } | null> {
     try {
         const controller = new AbortController();
         const timer = window.setTimeout(() => controller.abort(), 1500);
-        const res = await fetch(`${DIRECTOR_BRIDGE_DEFAULT_ENDPOINT}/bootstrap`, { signal: controller.signal });
+        const res = await fetch(`${candidate}/bootstrap`, { signal: controller.signal });
         window.clearTimeout(timer);
-        if (res.ok) {
-            // 桥启用 token 鉴权后，token 随 /bootstrap 下发（回环来源），SSE 与 /director/* 请求靠它过中间件
-            const body = (await res.json().catch(() => ({}))) as { token?: string };
-            return { endpoint: DIRECTOR_BRIDGE_DEFAULT_ENDPOINT, token: body.token || storedToken };
-        }
+        if (!res.ok) return null;
+        // 桥启用 token 鉴权后，token 随 /bootstrap 下发（回环来源），SSE 与 /director/* 请求靠它过中间件。
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; name?: string; token?: string };
+        if (!body.ok || (body.name && body.name !== "director-desk")) return null;
+        return { endpoint: candidate, token: body.token || fallbackToken };
     } catch {
         // 桥未启动：保持纯前端可用，静默跳过
+        return null;
+    }
+}
+
+/** 解析桥连接：显式配置（director-bridge-* 键）优先，否则依次探测同源与本机固定端口的 director-mcp。 */
+async function resolveDirectorBridge(): Promise<{ endpoint: string; token: string } | null> {
+    const storedEndpoint = (localStorage.getItem("director-bridge-url") || "").replace(/\/$/, "");
+    const storedToken = localStorage.getItem("director-bridge-token") || "";
+    if (storedEndpoint && storedToken) return { endpoint: storedEndpoint, token: storedToken };
+    for (const candidate of directorBridgeCandidates()) {
+        const bridge = await fetchDirectorBootstrap(candidate, storedToken);
+        if (bridge) return bridge;
     }
     return null;
 }
 
-/** 探测桥在线状态（首页"AI 桥状态"徽标用）。 */
+/** 探测桥在线状态（首页"AI 桥状态"徽标用）：同源优先，其次本机固定端口，只认自家桥。 */
 export async function probeDirectorBridge(): Promise<{ online: boolean; protocolVersion: number | null }> {
-    try {
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 1500);
-        const res = await fetch(`${DIRECTOR_BRIDGE_DEFAULT_ENDPOINT}/bootstrap`, { signal: controller.signal });
-        window.clearTimeout(timer);
-        if (!res.ok) return { online: false, protocolVersion: null };
-        const body = (await res.json()) as { protocolVersion?: number };
-        return { online: true, protocolVersion: Number(body.protocolVersion) || null };
-    } catch {
-        return { online: false, protocolVersion: null };
+    for (const candidate of directorBridgeCandidates()) {
+        try {
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), 1500);
+            const res = await fetch(`${candidate}/bootstrap`, { signal: controller.signal });
+            window.clearTimeout(timer);
+            if (!res.ok) continue;
+            const body = (await res.json()) as { ok?: boolean; name?: string; protocolVersion?: number };
+            if (!body.ok || (body.name && body.name !== "director-desk")) continue;
+            return { online: true, protocolVersion: Number(body.protocolVersion) || null };
+        } catch {
+            // 尝试下一个候选端点
+        }
     }
+    return { online: false, protocolVersion: null };
 }
 
 /**
