@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({
   id: '@haitang-hub/dsh-3d-director-desk',
   factory: (require) => {
     const React = require('react')
-    const { useEffect, useState } = React
+    const { useEffect, useRef, useState } = React
     const h = React.createElement
 
     const TAB_ID = 'dsh-3d-director-desk'
@@ -127,6 +127,7 @@ window.__ModuleLoader__.load({
     /** 右侧栏标签正文：工具栏 + 导演台画布。 */
     function DirectorDeskTab({ useTabInfo }) {
       const info = useBridgeInfo()
+      const iframeRef = useRef(null)
       // 画布插件经 sidebarRight.openTab('director-desk', { params: { instanceId } }) 打开本标签时，
       // 导航参数带目标实例：iframe 据此加载 /director/editor?instanceId=...（无参保持根路径旧行为）。
       const tabInfo = useTabInfo()
@@ -134,6 +135,47 @@ window.__ModuleLoader__.load({
       const [nonce, setNonce] = useState(0)
       const [busy, setBusy] = useState(false)
       const [actionError, setActionError] = useState('')
+
+      // Harness 模型代理：iframe 里的 AI 助手经 postMessage 请求宿主模型目录/代发对话，
+      // 这里转成同源 /api/director-desk.harness-* 请求（密钥只在宿主进程内）。
+      // 只认本标签 iframe 发来的消息（event.source 校验），响应按消息来源 origin 回发。
+      useEffect(() => {
+        const API = '/api/director-desk'
+        const onMessage = (event) => {
+          const iframe = iframeRef.current
+          if (!iframe || event.source !== iframe.contentWindow) return
+          const data = event.data
+          if (!data || typeof data !== 'object' || data.type !== 'dsh-harness:request') return
+          const requestId = String(data.requestId || '')
+          const reply = (payload) => {
+            try {
+              // sourceOrigin：iframe 里的页面据此拼出桥可直连的 harness 端点绝对地址
+              iframe.contentWindow?.postMessage({ type: 'dsh-harness:response', requestId, sourceOrigin: window.location.origin, ...payload }, event.origin || '*')
+            } catch { /* iframe 已卸载 */ }
+          }
+          if (data.action === 'models') {
+            fetch(`${API}.harness-models`)
+              .then((response) => response.json())
+              .then((body) => reply(body && typeof body === 'object' ? body : { ok: false, error: 'invalid response' }))
+              .catch((error) => reply({ ok: false, error: String(error?.message ?? error) }))
+            return
+          }
+          if (data.action === 'chat') {
+            fetch(`${API}.harness-chat`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(data.payload && typeof data.payload === 'object' ? data.payload : {}),
+            })
+              .then((response) => response.json())
+              .then((body) => reply(body && typeof body === 'object' ? body : { ok: false, error: 'invalid response' }))
+              .catch((error) => reply({ ok: false, error: String(error?.message ?? error) }))
+            return
+          }
+          reply({ ok: false, error: `unknown action: ${String(data.action)}` })
+        }
+        window.addEventListener('message', onMessage)
+        return () => window.removeEventListener('message', onMessage)
+      }, [])
 
       // 手动重建桥：宿主端 POST 会杀子进程并重新拉起，随后状态由 5s 轮询刷新。
       const restartBridge = () => {
@@ -182,6 +224,7 @@ window.__ModuleLoader__.load({
         info?.ready
           ? h('iframe', {
             key: `${instanceId || 'root'}#${nonce}`,
+            ref: iframeRef,
             src: `${bridgeOrigin(info)}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`,
             title: '3D 导演台',
             style: IFRAME_STYLE,

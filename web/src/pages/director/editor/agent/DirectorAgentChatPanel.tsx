@@ -3,6 +3,7 @@ import { ArrowUp, Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Erase
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
+import { decodeHarnessSelection, encodeHarnessSelection, listHarnessModels, type HarnessModelGroup } from "./harnessModels";
 import { useDirectorAgentChat, type AgentStep, type AgentTurn } from "./useDirectorAgentChat";
 
 /** 面板布局：停靠（左/右，磁性吸附）或自由浮动；位置、宽度与外观持久化；悬浮态宽高可自由调整。 */
@@ -179,23 +180,45 @@ function AgentModelRow() {
     const textModel = useConfigStore((state) => state.config.textModel);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const [open, setOpen] = useState(false);
+    const [harnessGroups, setHarnessGroups] = useState<HarnessModelGroup[] | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
+
+    // Harness 模型（DSH）：面板在宿主 iframe 中时拉取宿主已配置的 provider/模型。
+    // 失败（不在 DSH / 宿主无 llm 服务）静默降级为不自建该分组，菜单里只剩自配渠道。
+    useEffect(() => {
+        let alive = true;
+        listHarnessModels()
+            .then((groups) => { if (alive) setHarnessGroups(groups); })
+            .catch(() => { if (alive) setHarnessGroups([]); });
+        return () => { alive = false; };
+    }, []);
 
     // 只列 text 类模型；渠道里没有标注 text 的模型时整渠道兜底显示（capability 猜测可能不准）
     const textModelsOf = (channel: ModelChannel) => {
         const text = channel.models.filter((model) => model.capability === "text");
         return text.length ? text : channel.models;
     };
-    const options = channels.flatMap((channel) =>
+    const channelOptions = channels.flatMap((channel) =>
         textModelsOf(channel).map((model) => ({ value: encodeChannelModel(channel.id, model.name), label: channel.name ? `${model.name} (${channel.name})` : model.name })),
     );
+    const harnessOptions = (harnessGroups || []).flatMap((group) =>
+        group.models.map((model) => ({ value: encodeHarnessSelection(group.provider, model.id), label: `${model.name} (${group.providerName})` })),
+    );
+    const isHarnessValue = Boolean(decodeHarnessSelection(textModel));
 
-    // textModel 是历史遗留值/已失效时归一到第一个可选项，保证显示的就是实际用的模型
+    // textModel 是历史遗留值/已失效时归一到第一个可选项，保证显示的就是实际用的模型。
+    // harness 分组异步加载：加载完成前不动 harness 选择，避免被误重置到渠道模型。
     useEffect(() => {
-        if (options.length && !options.some((option) => option.value === textModel)) {
-            updateConfig("textModel", options[0].value);
+        if (isHarnessValue) {
+            if (harnessGroups && !harnessOptions.some((option) => option.value === textModel)) {
+                updateConfig("textModel", channelOptions[0]?.value || harnessOptions[0]?.value || textModel);
+            }
+            return;
         }
-    }, [textModel, options, updateConfig]);
+        if (channelOptions.length && !channelOptions.some((option) => option.value === textModel)) {
+            updateConfig("textModel", channelOptions[0].value);
+        }
+    }, [textModel, isHarnessValue, harnessGroups, channelOptions, harnessOptions, updateConfig]);
 
     // 点击外部 / Esc 关闭
     useEffect(() => {
@@ -214,7 +237,10 @@ function AgentModelRow() {
         };
     }, [open]);
 
-    const selectedLabel = options.find((option) => option.value === textModel)?.label;
+    const selectedLabel = isHarnessValue
+        ? harnessOptions.find((option) => option.value === textModel)?.label || decodeHarnessSelection(textModel)?.model || "Harness 模型"
+        : channelOptions.find((option) => option.value === textModel)?.label;
+    const harnessSelected = isHarnessValue && harnessOptions.some((option) => option.value === textModel);
 
     return (
         <div className="director-agent-model-select" ref={rootRef}>
@@ -231,25 +257,49 @@ function AgentModelRow() {
             </button>
             {open ? (
                 <div className="director-agent-model-menu" role="listbox" aria-label="模型列表">
-                    {options.length ? (
-                        options.map((option) => (
-                            <button
-                                key={option.value}
-                                type="button"
-                                role="option"
-                                aria-selected={option.value === textModel}
-                                className={`director-agent-model-option${option.value === textModel ? " is-selected" : ""}`}
-                                onClick={() => {
-                                    updateConfig("textModel", option.value);
-                                    setOpen(false);
-                                }}
-                            >
-                                {option.label}
-                            </button>
-                        ))
-                    ) : (
+                    {harnessGroups && harnessOptions.length ? (
+                        <>
+                            <div className="director-agent-model-group" role="presentation">Harness 模型（DSH）</div>
+                            {harnessOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={harnessSelected && option.value === textModel}
+                                    className={`director-agent-model-option${harnessSelected && option.value === textModel ? " is-selected" : ""}`}
+                                    onClick={() => {
+                                        updateConfig("textModel", option.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </>
+                    ) : null}
+                    {channelOptions.length ? (
+                        <>
+                            {harnessGroups && harnessOptions.length ? <div className="director-agent-model-group" role="presentation">自配渠道</div> : null}
+                            {channelOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={!harnessSelected && option.value === textModel}
+                                    className={`director-agent-model-option${!harnessSelected && option.value === textModel ? " is-selected" : ""}`}
+                                    onClick={() => {
+                                        updateConfig("textModel", option.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </>
+                    ) : null}
+                    {!channelOptions.length && !(harnessGroups && harnessOptions.length) ? (
                         <div className="director-agent-model-empty">未配置模型 · 请在「模型配置」添加渠道</div>
-                    )}
+                    ) : null}
                 </div>
             ) : null}
         </div>

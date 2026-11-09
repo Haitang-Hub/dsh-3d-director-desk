@@ -10,9 +10,11 @@
 import { create } from "zustand";
 
 import { randomId } from "@/lib/utils";
+import { useConfigStore } from "@/stores/use-config-store";
 
 import { DIRECTOR_AGENT_SYSTEM_PROMPT, DIRECTOR_AGENT_TOOLS } from "./agentTools";
 import { callAgentLlm, parseAgentToolArguments, resolveAgentRequestConfig, type AgentContentPart, type AgentLlmMessage } from "./agentLlm";
+import { decodeHarnessSelection, listHarnessModels } from "./harnessModels";
 import { extractTextToolCall, stripReasoningAndToolCalls } from "./agentTextTools";
 import { runDirectorTool } from "../hooks/use-director-agent-bridge";
 
@@ -67,15 +69,32 @@ export const useDirectorAgentChat = create<DirectorAgentChatStore>((set, get) =>
         // 纯图片没有文字时补一个占位目标，模型侧也能理解
         const goal = text || "请分析我上传的图片";
 
-        // 渠道校验前置：没配渠道直接给出可操作的错误
-        try {
-            resolveAgentRequestConfig();
-        } catch (error) {
-            const messageText = error instanceof Error ? error.message : String(error);
-            set((state) => ({
-                turns: [...state.turns, { id: randomId(), goal, images: imageUrls, previews: [], status: "failed", steps: [], progressText: "", conclusion: "", error: messageText }],
-            }));
-            return;
+        // 模型来源校验前置：Harness 模型校验宿主可用性与模型存在性；自配渠道校验渠道完整性。
+        // 没配好直接给出可操作的错误，不开 turn。
+        const harnessRoute = decodeHarnessSelection(useConfigStore.getState().config.textModel);
+        if (harnessRoute) {
+            try {
+                if (imageUrls.length) throw new Error("Harness 模型暂不支持图片消息：请移除图片附件，或在模型选择里改用自配渠道的 vision 模型");
+                const groups = await listHarnessModels();
+                const found = groups.some((group) => group.provider === harnessRoute.provider && group.models.some((item) => item.id === harnessRoute.model));
+                if (!found) throw new Error(`Harness 中已没有模型 ${harnessRoute.provider}/${harnessRoute.model}，请重新选择模型`);
+            } catch (error) {
+                const messageText = error instanceof Error ? error.message : String(error);
+                set((state) => ({
+                    turns: [...state.turns, { id: randomId(), goal, images: imageUrls, previews: [], status: "failed", steps: [], progressText: "", conclusion: "", error: messageText }],
+                }));
+                return;
+            }
+        } else {
+            try {
+                resolveAgentRequestConfig();
+            } catch (error) {
+                const messageText = error instanceof Error ? error.message : String(error);
+                set((state) => ({
+                    turns: [...state.turns, { id: randomId(), goal, images: imageUrls, previews: [], status: "failed", steps: [], progressText: "", conclusion: "", error: messageText }],
+                }));
+                return;
+            }
         }
 
         const turn: AgentTurn = { id: randomId(), goal, images: imageUrls, previews: [], status: "running", steps: [], progressText: "正在思考…", conclusion: "", error: "" };

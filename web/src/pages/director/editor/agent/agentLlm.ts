@@ -4,6 +4,7 @@
  */
 
 import { buildApiUrl, decodeChannelModel, resolveModelChannel, useConfigStore } from "@/stores/use-config-store";
+import { callHarnessLlm, decodeHarnessSelection } from "./harnessModels";
 
 export type AgentContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
@@ -77,6 +78,14 @@ function describeFetchError(error: unknown) {
 
 /** 调用一次模型；返回 assistant 文本与工具调用（两种协议统一为同一结果形态）。 */
 export async function callAgentLlm(messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
+    // Harness 模型：textModel 编码为 harness::<provider>::<model> 时，改经宿主插件代理调用，
+    // provider 的 API key 只存在于 harness 进程内。
+    const harnessRoute = decodeHarnessSelection(useConfigStore.getState().config.textModel);
+    if (harnessRoute) {
+        const result = await callHarnessLlm({ provider: harnessRoute.provider, model: harnessRoute.model, messages, tools, temperature: 0.6 });
+        if (signal?.aborted) throw new Error("已取消");
+        return result;
+    }
     const requestConfig = resolveAgentRequestConfig();
     try {
         return requestConfig.apiFormat === "anthropic" ? await callAnthropicLlm(requestConfig, messages, tools, signal) : await callOpenAiLlm(requestConfig, messages, tools, signal);
