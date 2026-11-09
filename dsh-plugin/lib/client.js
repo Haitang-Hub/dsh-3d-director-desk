@@ -15,7 +15,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-3d-director-desk',
+  id: '@haitang-hub/dsh-3d-director-desk',
   factory: (require) => {
     const React = require('react')
     const { useEffect, useState } = React

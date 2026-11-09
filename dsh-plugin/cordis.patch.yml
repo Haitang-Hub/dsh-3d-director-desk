@@ -6,7 +6,7 @@
 # Config.port 都读它，改端口只改这一处，避免 url 与插件配置两处写死后静默错配。
 - insert:
     - id: dsh-3d-director-desk
-      name: dsh-3d-director-desk
+      name: '@haitang-hub/dsh-3d-director-desk'
       config:
         root: !!js dshHomePath('3d-director-desk')
     - id: mcp-director-desk
