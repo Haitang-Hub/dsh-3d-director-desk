@@ -1,6 +1,6 @@
 {
   "name": "@haitang-hub/dsh-3d-director-desk",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "3D 导演台右侧栏插件：画布与对话并排，Agent 经 director-desk 工具实时编排场景。",
   "icon": "./icon.png",
   "type": "module",
