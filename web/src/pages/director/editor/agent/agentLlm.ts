@@ -31,15 +31,16 @@ export type AgentRequestConfig = {
 };
 
 /**
- * 解析 Agent 实际使用的模型：模型名必须落在解析到的渠道里——
- * textModel 是旧值/已失效（如历史遗留的裸模型名）时，退到该渠道第一个 text 模型，
- * 避免出现「A 渠道的地址 + B 模型名」的错配请求。
+ * 解析 Agent 使用的模型：导演台的文本默认模型同时就是 Agent 模型。
+ * 模型名必须落在解析到的渠道里——旧值/已失效（如历史遗留的裸模型名）时，
+ * 退到该渠道第一个 text 模型，避免出现「A 渠道的地址 + B 模型名」的错配请求。
  */
 function resolveAgentModelConfig() {
     const config = useConfigStore.getState().config;
-    const channel = resolveModelChannel(config, config.textModel);
-    const decoded = decodeChannelModel(config.textModel);
-    const selected = (decoded?.model || config.textModel || "").trim();
+    const agentModel = config.textModel;
+    const channel = resolveModelChannel(config, agentModel);
+    const decoded = decodeChannelModel(agentModel);
+    const selected = (decoded?.model || agentModel || "").trim();
     const matched = channel.models.some((item) => item.name === selected) ? selected : "";
     const fallback = channel.models.find((item) => item.capability === "text") || channel.models[0];
     return { config, channel, model: matched || fallback?.name || "" };
@@ -78,7 +79,7 @@ function describeFetchError(error: unknown) {
 
 /** 调用一次模型；返回 assistant 文本与工具调用（两种协议统一为同一结果形态）。 */
 export async function callAgentLlm(messages: AgentLlmMessage[], tools: unknown, signal?: AbortSignal): Promise<{ content: string; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
-    // Harness 模型：textModel 编码为 harness::<provider>::<model> 时，改经宿主插件代理调用，
+    // Harness 模型：Agent 模型编码为 harness::<provider>::<model> 时，改经宿主插件代理调用，
     // provider 的 API key 只存在于 harness 进程内。
     const harnessRoute = decodeHarnessSelection(useConfigStore.getState().config.textModel);
     if (harnessRoute) {

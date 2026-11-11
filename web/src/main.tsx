@@ -9,6 +9,7 @@ import { AppProviders } from "@/components/layout/app-providers";
 import "@/i18n";
 import { initAnalytics } from "@/lib/analytics";
 import { initMirrorAvailability } from "@/lib/mirrored-storage";
+import { initDshSettingsBridge } from "@/lib/dsh-settings-bridge";
 import { hydrateLocalStorageFromStore } from "@/services/local-store";
 import { router } from "@/router";
 
@@ -26,6 +27,7 @@ void (async () => {
         })(),
         new Promise((resolve) => setTimeout(resolve, 2000)),
     ]);
+    initDshSettingsBridge("director-desk");
     createRoot(document.getElementById("root")!).render(
         <React.StrictMode>
             <AppProviders>

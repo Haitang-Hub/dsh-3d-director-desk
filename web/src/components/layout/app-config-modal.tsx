@@ -36,7 +36,7 @@ function commitChannels(config: AiConfig, channels: ModelChannel[]) {
     const updateConfig = useConfigStore.getState().updateConfig;
     updateConfig("channels", channels);
     updateConfig("models", modelOptionsFromChannels(channels));
-    updateConfig("textModel", normalizeModelOptionValue(useConfigStore.getState().config.textModel, channels));
+    updateConfig("textModel", normalizeModelOptionValue(config.textModel, channels));
 }
 
 function withChannels(config: AiConfig, channels: ModelChannel[]): AiConfig {

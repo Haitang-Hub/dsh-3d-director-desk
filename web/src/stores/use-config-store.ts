@@ -38,6 +38,8 @@ export type AiConfig = {
     imageModel: string;
     videoModel: string;
     textModel: string;
+    /** 导演台的文本模型同时就是 Agent 模型；此字段仅保留以兼容共享设置桥的文本字段清单。 */
+    agentModel: string;
     audioModel: string;
     audioVoice: string;
     audioFormat: string;
@@ -85,31 +87,191 @@ const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 export const LOCAL_PROXY_PACKAGE = "@basketikun/canvas-proxy";
 export const DEFAULT_LOCAL_PROXY_URL = "http://127.0.0.1:23210";
 
+/** 火山方舟 Seedream 图片生成（OpenAI 兼容的 /images/generations）。 */
+export const DEFAULT_VOLCENGINE_IMAGE_SCRIPT = `/**
+ * 火山方舟 Seedream 图片生成脚本。
+ * - POST {baseUrl}/images/generations，baseUrl 形如 https://ark.cn-beijing.volces.com/api/v3
+ * - 输出尺寸按用户比例缩放到长边约 2048（Seedream 推荐 2K 档）
+ * - 参考图通过 image 字段传入（data URL 或 URL）
+ * @param {string} prompt
+ * @param {string[]} images - 参考图 data URL；为空时纯文生图
+ * @param {object} params
+ * @param {string} params.size - 输出尺寸，如 "1024x1024"
+ * @param {number} params.count - 生成张数（接口每次返回 1 张，按次数循环）
+ * @param {string} model
+ * @param {string} baseUrl - 渠道 Base URL（含 /api/v3）
+ * @param {string} apiKey
+ * @param {function} request
+ * @returns {Promise<string[]>}
+ */
+function seedreamSize(size) {
+  const match = String(size || "").trim().match(/^(\\d+)x(\\d+)$/i);
+  if (!match) return "2K";
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  const longSide = Math.max(width, height);
+  if (!longSide) return "2K";
+  if (longSide >= 2048) return width + "x" + height;
+  const scale = 2048 / longSide;
+  return Math.round(width * scale) + "x" + Math.round(height * scale);
+}
+
+async function generateImage({ prompt, images, params, model, baseUrl, apiKey, request }) {
+  const body = {
+    model: model,
+    prompt: prompt,
+    size: seedreamSize(params.size),
+    response_format: "url",
+    watermark: false,
+  };
+  if (images && images.length) body.image = images.length === 1 ? images[0] : images;
+
+  const count = Math.max(1, Math.floor(Number(params.count) || 1));
+  const urls = [];
+  for (let index = 0; index < count; index += 1) {
+    const result = await request({
+      method: "post",
+      url: \`\${baseUrl}/images/generations\`,
+      headers: { "Content-Type": "application/json", Authorization: \`Bearer \${apiKey}\` },
+      data: body,
+    });
+    for (const item of (result && Array.isArray(result.data) ? result.data : [])) {
+      if (item && item.url) urls.push(item.url);
+      else if (item && item.b64_json) urls.push(\`data:image/png;base64,\${item.b64_json}\`);
+    }
+  }
+  if (!urls.length) throw new Error("Seedream 返回中没有图片数据");
+  return urls;
+}
+
+return await generateImage({ prompt, images, params, model, baseUrl, apiKey, request });`;
+
+/** 火山方舟 Seedance 视频生成（异步任务接口）。 */
+export const DEFAULT_VOLCENGINE_VIDEO_SCRIPT = `/**
+ * 火山方舟 Seedance 视频生成脚本。
+ * - POST {baseUrl}/contents/generations/tasks 创建任务（baseUrl 含 /api/v3）
+ * - 轮询 GET {baseUrl}/contents/generations/tasks/{id}，succeeded 后取 content.video_url
+ * - mode "frames" 用首/尾帧，其余有图场景用参考图
+ * @param {string} prompt
+ * @param {string[]} images - data URL；首尾帧或参考图
+ * @param {object} params
+ * @param {string} params.mode - "frames" | "reference"
+ * @param {string} params.resolution - 如 "720p"
+ * @param {string} params.ratio - 如 "16:9"；"auto" 时省略
+ * @param {number} params.seconds - 时长（秒），限制在 4–15
+ * @param {string} model
+ * @param {string} baseUrl
+ * @param {string} apiKey
+ * @param {function} request
+ * @param {function} poll
+ * @returns {Promise<{url:string}>}
+ */
+async function generateVideo({ prompt, images, params, model, baseUrl, apiKey, request, poll }) {
+  const content = [{ type: "text", text: prompt }];
+  if (images && images.length) {
+    if (params.mode === "frames") {
+      if (images[0]) content.push({ type: "image_url", image_url: { url: images[0] }, role: "first_frame" });
+      if (images[1]) content.push({ type: "image_url", image_url: { url: images[1] }, role: "last_frame" });
+    } else {
+      for (const url of images.slice(0, 4)) content.push({ type: "image_url", image_url: { url: url }, role: "reference_image" });
+    }
+  }
+
+  const body = { model: model, content: content };
+  if (params.ratio && params.ratio !== "auto") body.ratio = params.ratio;
+  body.duration = Math.min(15, Math.max(4, Math.round(Number(params.seconds) || 5)));
+  body.watermark = Boolean(params.watermark);
+  if (params.generateAudio && /seedance-(1-5|2)/.test(model)) body.generate_audio = true;
+  const resolution = String(params.resolution || "").toLowerCase();
+  if (/^\\d+p$/.test(resolution)) body.resolution = resolution;
+
+  const created = await request({
+    method: "post",
+    url: \`\${baseUrl}/contents/generations/tasks\`,
+    headers: { "Content-Type": "application/json", Authorization: \`Bearer \${apiKey}\` },
+    data: body,
+  });
+  const taskId = created && (created.id || created.task_id);
+  if (!taskId) throw new Error("Seedance 创建任务失败：响应缺少任务 ID");
+
+  return await poll(
+    () => request({
+      method: "get",
+      url: \`\${baseUrl}/contents/generations/tasks/\${taskId}\`,
+      headers: { Authorization: \`Bearer \${apiKey}\` },
+    }),
+    (task) => {
+      if (!task) return null;
+      if (task.status === "failed" || task.status === "cancelled") throw new Error((task.error && task.error.message) || "Seedance 视频生成失败");
+      if (task.status === "succeeded") {
+        const url = (task.content && task.content.video_url) || task.video_url;
+        if (!url) throw new Error("Seedance 结果缺少视频地址");
+        return { url: url };
+      }
+      return null;
+    },
+    { intervalMs: 5000, timeoutMs: 600000 },
+  );
+}
+
+return await generateVideo({ prompt, images, params, model, baseUrl, apiKey, request, poll });`;
+
+/** 阿里云百炼 Qwen-TTS 语音合成。 */
+export const DEFAULT_DASHSCOPE_TTS_SCRIPT = `/**
+ * 阿里云百炼 Qwen-TTS 语音合成脚本。
+ * - POST {baseUrl}/api/v1/services/aigc/multimodal-generation/generation
+ * - 返回 output.audio.url，由前端下载为音频文件
+ * - voice 仅接受 Qwen-TTS 音色，其余值回退 Cherry
+ * @param {string} prompt - 待合成文本
+ * @param {object} params
+ * @param {string} params.voice
+ * @param {string} model
+ * @param {string} baseUrl - 渠道 Base URL，如 https://dashscope.aliyuncs.com
+ * @param {string} apiKey
+ * @param {function} request
+ * @returns {Promise<{url:string}>}
+ */
+const QWEN_TTS_VOICES = ["Cherry", "Serena", "Ethan", "Chelsie"];
+
+async function synthesize({ prompt, params, model, baseUrl, apiKey, request }) {
+  const voice = QWEN_TTS_VOICES.includes(params.voice) ? params.voice : "Cherry";
+  const result = await request({
+    method: "post",
+    url: \`\${baseUrl}/api/v1/services/aigc/multimodal-generation/generation\`,
+    headers: { "Content-Type": "application/json", Authorization: \`Bearer \${apiKey}\` },
+    data: { model: model, input: { text: prompt, voice: voice } },
+  });
+  const audio = result && result.output && result.output.audio;
+  if (!audio) throw new Error((result && result.message) || "Qwen-TTS 返回中没有音频数据");
+  if (audio.url) return { url: audio.url };
+  if (audio.data) return { url: "data:audio/wav;base64," + audio.data };
+  throw new Error("Qwen-TTS 返回中没有音频地址");
+}
+
+return await synthesize({ prompt, params, model, baseUrl, apiKey, request });`;
+
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: OPENAI_BASE_URL,
+    baseUrl: "https://api.deepseek.com",
     apiKey: "",
     apiFormat: "openai",
+    // 导演台只有 Agent 需要模型：默认只配一个文本渠道，不配置图片/视频/语音。
     channels: [
         {
-            id: "default",
-            name: i18n.t("config.channels.defaultName"),
-            baseUrl: OPENAI_BASE_URL,
+            id: "deepseek",
+            name: "DeepSeek",
+            baseUrl: "https://api.deepseek.com",
             apiKey: "",
             apiFormat: "openai",
-            models: [
-                { name: "gpt-image-2", capability: "image" },
-                { name: "grok-imagine-video", capability: "video" },
-                { name: "gpt-5.5", capability: "text" },
-                { name: "gpt-4o-mini-tts", capability: "audio" },
-            ],
+            models: [{ name: "deepseek-flash", capability: "text" }],
         },
     ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
+    model: "deepseek::deepseek-flash",
+    imageModel: "",
+    videoModel: "",
+    textModel: "deepseek::deepseek-flash",
+    agentModel: "",
+    audioModel: "",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -121,7 +283,7 @@ export const defaultConfig: AiConfig = {
     videoMode: "frames",
     systemPrompt: "",
     reasoningEffort: "auto",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
+    models: ["deepseek::deepseek-flash"],
     quality: "auto",
     size: "1:1",
     background: "",
@@ -134,6 +296,72 @@ export const defaultConfig: AiConfig = {
     imageRatio: "auto",
     videoRatio: "auto",
 };
+
+// 旧版内置的默认渠道：最早是单一「默认渠道」（OpenAI 地址 + 四个占位模型），
+// 后来是 DeepSeek/火山方舟/百炼三渠道组合。导演台只需要文本模型，用户完全没动过
+// 这两套默认时一次性收敛为上面的纯文本默认；加过 Key 或改过任意一项就原样保留。
+const LEGACY_DEFAULT_MODELS = ["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"];
+const PREVIOUS_DEFAULT_CHANNELS = [
+    { id: "deepseek", baseUrl: "https://api.deepseek.com", models: ["deepseek-flash"] },
+    { id: "volcengine", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", models: ["doubao-seedream-5-0-pro-260628", "doubao-seedance-2-0-260128"] },
+    { id: "dashscope", baseUrl: "https://dashscope.aliyuncs.com", models: ["qwen3-tts-flash"] },
+];
+const LEGACY_DEFAULT_MIGRATION_KEY = "haitang-aigc:legacy-default-migrated-at";
+
+function channelModelNames(channel: Partial<ModelChannel> | undefined) {
+    return ((channel?.models || []) as Array<ModelChannel["models"][number] | string>)
+        .map((model) => (typeof model === "string" ? model : model?.name || ""))
+        .filter(Boolean);
+}
+
+function isPristineLegacyChannel(channel: Partial<ModelChannel> | undefined) {
+    if (!channel || channel.id !== "default") return false;
+    if ((channel.apiKey || "").trim()) return false;
+    if ((channel.apiFormat || "openai") !== "openai") return false;
+    if ((channel.baseUrl || "").trim().replace(/\/+$/, "").toLowerCase() !== "https://api.openai.com") return false;
+    const names = channelModelNames(channel);
+    if (names.length !== LEGACY_DEFAULT_MODELS.length) return false;
+    return LEGACY_DEFAULT_MODELS.every((name) => names.includes(name));
+}
+
+function isPristinePreviousDefaultChannels(channels: Array<Partial<ModelChannel>>) {
+    if (channels.length !== PREVIOUS_DEFAULT_CHANNELS.length) return false;
+    return PREVIOUS_DEFAULT_CHANNELS.every((expected) => {
+        const channel = channels.find((item) => item?.id === expected.id);
+        if (!channel || (channel.apiKey || "").trim()) return false;
+        if ((channel.apiFormat || "openai") !== "openai") return false;
+        if ((channel.baseUrl || "").trim().replace(/\/+$/, "").toLowerCase() !== expected.baseUrl) return false;
+        const names = channelModelNames(channel);
+        return names.length === expected.models.length && expected.models.every((name) => names.includes(name));
+    });
+}
+
+function shouldMigrateLegacyDefaults(persisted: Partial<AiConfig>) {
+    if (Array.isArray(persisted.channels) && isPristinePreviousDefaultChannels(persisted.channels)) return true;
+    if ((persisted.apiKey || "").trim()) return false;
+    if (persisted.baseUrl && persisted.baseUrl.trim().replace(/\/+$/, "").toLowerCase() !== "https://api.openai.com") return false;
+    return Array.isArray(persisted.channels) && persisted.channels.length === 1 && isPristineLegacyChannel(persisted.channels[0]);
+}
+
+function migrateLegacyDefaults(config: AiConfig): AiConfig {
+    // 记下迁移时刻：DSH 设置桥据此抬高本机分区时间戳，避免宿主里的旧默认反冲，
+    // 并在连上宿主后主动把新渠道推回去。
+    try {
+        localStorage.setItem(LEGACY_DEFAULT_MIGRATION_KEY, String(Date.now()));
+    } catch {
+        /* 隐私模式下忽略 */
+    }
+    return {
+        ...config,
+        channels: defaultConfig.channels.map((channel) => ({ ...channel, models: channel.models.map((model) => ({ ...model })) })),
+        models: [...defaultConfig.models],
+        model: defaultConfig.model,
+        imageModel: "",
+        videoModel: "",
+        textModel: defaultConfig.textModel,
+        audioModel: "",
+    };
+}
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
     url: "",
@@ -158,7 +386,7 @@ type ConfigStore = {
     clearPromptContinue: () => void;
 };
 
-const VIDEO_KEYWORDS = ["video", "sora", "veo", "kling", "wan", "hailuo"];
+const VIDEO_KEYWORDS = ["video", "sora", "veo", "kling", "wan", "hailuo", "seedance"];
 
 export function boolConfig(value: string, fallback: boolean) {
     return value ? value === "true" : fallback;
@@ -489,44 +717,59 @@ export const useConfigStore = create<ConfigStore>()(
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
-                const config = { ...defaultConfig, ...persistedConfig };
-                if (!Array.isArray(persistedConfig.channels)) config.channels = [];
+                let config = { ...defaultConfig, ...persistedConfig };
+                if (!Array.isArray(persistedConfig.channels)) {
+                    // 全新安装（无历史渠道、也无旧版单渠道字段）直接采用默认渠道组合；旧配置仍走合并字段兜底
+                    config.channels = persistedConfig.baseUrl || persistedConfig.apiKey ? [] : defaultConfig.channels;
+                }
+                const legacyMigrated = shouldMigrateLegacyDefaults(persistedConfig);
+                if (legacyMigrated) config = migrateLegacyDefaults(config);
                 // 本项目不再使用本地转发代理：忽略历史遗留的 proxyEnabled，一律直连
                 config.proxyEnabled = false;
                 const channels = migrateModelScripts(normalizeChannels(config));
                 const models = modelOptionsFromChannels(channels);
-                return {
-                    ...current,
-                    webdav: { ...defaultWebdavSyncConfig, ...persistedWebdav },
-                    config: {
-                        ...config,
-                        channelMode: "local",
-                        apiFormat: normalizeApiFormat(config.apiFormat),
-                        channels,
-                        models,
-                        imageModel: normalizeModelOptionValue(config.imageModel || config.model, channels),
-                        videoModel: normalizeModelOptionValue(config.videoModel, channels),
-                        textModel: normalizeModelOptionValue(config.textModel || config.model, channels),
-                        audioModel: normalizeModelOptionValue(config.audioModel || defaultConfig.audioModel, channels),
-                        audioVoice: config.audioVoice || defaultConfig.audioVoice,
-                        audioFormat: config.audioFormat || defaultConfig.audioFormat,
-                        audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
-                        audioInstructions: config.audioInstructions || "",
-                        reasoningEffort: config.reasoningEffort || "auto",
-                        videoSeconds: config.videoSeconds || "6",
-                        vquality: config.vquality || "720",
-                        videoGenerateAudio: config.videoGenerateAudio || "true",
-                        videoWatermark: config.videoWatermark || "false",
-                        videoMode: config.videoMode === "reference" ? "reference" : "frames",
-                        canvasImageCount: config.canvasImageCount || "3",
-                        proxyEnabled: Boolean(config.proxyEnabled),
-                        proxyUrl: config.proxyUrl || DEFAULT_LOCAL_PROXY_URL,
-                        nodeRegenerateBehavior: config.nodeRegenerateBehavior || "new-node",
-                        autoFocusOnSelect: Boolean(config.autoFocusOnSelect),
-                        imageRatio: config.imageRatio || "auto",
-                        videoRatio: config.videoRatio || "auto",
-                    },
+                const webdav = { ...defaultWebdavSyncConfig, ...persistedWebdav };
+                const mergedConfig: AiConfig = {
+                    ...config,
+                    channelMode: "local",
+                    apiFormat: normalizeApiFormat(config.apiFormat),
+                    channels,
+                    models,
+                    // 导演台只用文本模型：不再把通用 model 回退成图片/语音模型。
+                    imageModel: normalizeModelOptionValue(config.imageModel, channels),
+                    videoModel: normalizeModelOptionValue(config.videoModel, channels),
+                    textModel: normalizeModelOptionValue(config.textModel || config.model, channels),
+                    audioModel: normalizeModelOptionValue(config.audioModel, channels),
+                    audioVoice: config.audioVoice || defaultConfig.audioVoice,
+                    audioFormat: config.audioFormat || defaultConfig.audioFormat,
+                    audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
+                    audioInstructions: config.audioInstructions || "",
+                    reasoningEffort: config.reasoningEffort || "auto",
+                    videoSeconds: config.videoSeconds || "6",
+                    vquality: config.vquality || "720",
+                    videoGenerateAudio: config.videoGenerateAudio || "true",
+                    videoWatermark: config.videoWatermark || "false",
+                    videoMode: config.videoMode === "reference" ? "reference" : "frames",
+                    canvasImageCount: config.canvasImageCount || "3",
+                    proxyEnabled: Boolean(config.proxyEnabled),
+                    proxyUrl: config.proxyUrl || DEFAULT_LOCAL_PROXY_URL,
+                    nodeRegenerateBehavior: config.nodeRegenerateBehavior || "new-node",
+                    autoFocusOnSelect: Boolean(config.autoFocusOnSelect),
+                    imageRatio: config.imageRatio || "auto",
+                    videoRatio: config.videoRatio || "auto",
                 };
+                // persist 的 hydrate 不回写存储，迁移结果要自己落盘，否则下次启动又读到旧默认。
+                if (legacyMigrated) {
+                    try {
+                        const raw = JSON.stringify({ state: { config: mergedConfig, webdav }, version: 0 });
+                        const store = mirroredLocalStorage();
+                        if (store) store.setItem(CONFIG_STORE_KEY, raw);
+                        else localStorage.setItem(CONFIG_STORE_KEY, raw);
+                    } catch {
+                        /* 隐私模式下忽略 */
+                    }
+                }
+                return { ...current, webdav, config: mergedConfig };
             },
         },
     ),

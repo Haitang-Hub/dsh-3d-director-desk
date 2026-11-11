@@ -177,7 +177,7 @@ function TurnView({ turn }: { turn: AgentTurn }) {
 /** 输入框内的模型选择：自绘无边框下拉（原生 select 的弹出列表无法定制样式）。 */
 function AgentModelRow() {
     const channels = useConfigStore((state) => state.config.channels);
-    const textModel = useConfigStore((state) => state.config.textModel);
+    const agentModel = useConfigStore((state) => state.config.textModel);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const [open, setOpen] = useState(false);
     const [harnessGroups, setHarnessGroups] = useState<HarnessModelGroup[] | null>(null);
@@ -204,21 +204,21 @@ function AgentModelRow() {
     const harnessOptions = (harnessGroups || []).flatMap((group) =>
         group.models.map((model) => ({ value: encodeHarnessSelection(group.provider, model.id), label: `${model.name} (${group.providerName})` })),
     );
-    const isHarnessValue = Boolean(decodeHarnessSelection(textModel));
+    const isHarnessValue = Boolean(decodeHarnessSelection(agentModel));
 
-    // textModel 是历史遗留值/已失效时归一到第一个可选项，保证显示的就是实际用的模型。
+    // Agent 模型是历史遗留值/已失效时归一到第一个可选项，保证显示的就是实际用的模型。
     // harness 分组异步加载：加载完成前不动 harness 选择，避免被误重置到渠道模型。
     useEffect(() => {
         if (isHarnessValue) {
-            if (harnessGroups && !harnessOptions.some((option) => option.value === textModel)) {
-                updateConfig("textModel", channelOptions[0]?.value || harnessOptions[0]?.value || textModel);
+            if (harnessGroups && !harnessOptions.some((option) => option.value === agentModel)) {
+                updateConfig("textModel", channelOptions[0]?.value || harnessOptions[0]?.value || agentModel);
             }
             return;
         }
-        if (channelOptions.length && !channelOptions.some((option) => option.value === textModel)) {
+        if (channelOptions.length && !channelOptions.some((option) => option.value === agentModel)) {
             updateConfig("textModel", channelOptions[0].value);
         }
-    }, [textModel, isHarnessValue, harnessGroups, channelOptions, harnessOptions, updateConfig]);
+    }, [agentModel, isHarnessValue, harnessGroups, channelOptions, harnessOptions, updateConfig]);
 
     // 点击外部 / Esc 关闭
     useEffect(() => {
@@ -238,9 +238,9 @@ function AgentModelRow() {
     }, [open]);
 
     const selectedLabel = isHarnessValue
-        ? harnessOptions.find((option) => option.value === textModel)?.label || decodeHarnessSelection(textModel)?.model || "Harness 模型"
-        : channelOptions.find((option) => option.value === textModel)?.label;
-    const harnessSelected = isHarnessValue && harnessOptions.some((option) => option.value === textModel);
+        ? harnessOptions.find((option) => option.value === agentModel)?.label || decodeHarnessSelection(agentModel)?.model || "Harness 模型"
+        : channelOptions.find((option) => option.value === agentModel)?.label;
+    const harnessSelected = isHarnessValue && harnessOptions.some((option) => option.value === agentModel);
 
     return (
         <div className="director-agent-model-select" ref={rootRef}>
@@ -265,8 +265,8 @@ function AgentModelRow() {
                                     key={option.value}
                                     type="button"
                                     role="option"
-                                    aria-selected={harnessSelected && option.value === textModel}
-                                    className={`director-agent-model-option${harnessSelected && option.value === textModel ? " is-selected" : ""}`}
+                                    aria-selected={harnessSelected && option.value === agentModel}
+                                    className={`director-agent-model-option${harnessSelected && option.value === agentModel ? " is-selected" : ""}`}
                                     onClick={() => {
                                         updateConfig("textModel", option.value);
                                         setOpen(false);
@@ -285,8 +285,8 @@ function AgentModelRow() {
                                     key={option.value}
                                     type="button"
                                     role="option"
-                                    aria-selected={!harnessSelected && option.value === textModel}
-                                    className={`director-agent-model-option${!harnessSelected && option.value === textModel ? " is-selected" : ""}`}
+                                    aria-selected={!harnessSelected && option.value === agentModel}
+                                    className={`director-agent-model-option${!harnessSelected && option.value === agentModel ? " is-selected" : ""}`}
                                     onClick={() => {
                                         updateConfig("textModel", option.value);
                                         setOpen(false);

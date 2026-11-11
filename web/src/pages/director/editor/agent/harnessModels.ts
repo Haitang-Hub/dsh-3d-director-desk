@@ -4,7 +4,8 @@
  *
  * - provider 的 API key 只存在于 harness 进程内，页面与桥都拿不到；
  * - 不在 DSH 面板中时所有请求都会失败，调用方据此降级提示用自配渠道；
- * - 选择值编码进 config.textModel：`harness::<provider>::<model>`，与渠道编码 `channelId::modelName` 区分。
+ * - 选择值编码进 config.textModel：`harness::<provider>::<model>`，
+ *   与渠道编码 `channelId::modelName` 区分。
  */
 
 export const HARNESS_SELECTION_PREFIX = "harness::";

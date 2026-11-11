@@ -400,6 +400,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 2px;
 }
 
@@ -427,10 +428,12 @@
   height: 28px;
 }
 
-/* 输入框内的模型选择：自绘无边框下拉 */
+/* 输入框内的模型选择：自绘无边框下拉；窄面板时先压缩自己，不挤压右侧工具组 */
 .director-agent-model-select {
   position: relative;
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 /* 特异性高于 .director-desk-app button 的 font-size: inherit，否则字号设置不生效 */
@@ -438,6 +441,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  width: 100%;
+  min-width: 0;
   max-width: 190px;
   border: none;
   border-radius: 7px;
@@ -484,6 +489,7 @@
   min-width: 216px;
   max-height: 190px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 12px;
   padding: 3px;
@@ -503,6 +509,9 @@
 }
 
 .director-agent-panel .director-agent-model-option {
+  /* 按钮的 overflow: hidden 让自动最小高度失效；模型多时会被 flex 压扁到几个像素，
+     文字只剩顶部（看起来像一排点），必须禁止收缩才能正常滚动。 */
+  flex: none;
   overflow: hidden;
   border: none;
   border-radius: 8px;
@@ -536,6 +545,7 @@
 }
 
 .director-agent-model-group {
+  flex: none;
   padding: 5px 9px 2px;
   font-size: 10px;
   letter-spacing: 0.04em;
