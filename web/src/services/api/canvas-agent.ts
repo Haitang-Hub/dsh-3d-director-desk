@@ -64,16 +64,16 @@ export async function postToolResult(endpoint: string, token: string, clientId: 
     await fetchAgentJson(endpoint, token, `/canvas/result?clientId=${encodeURIComponent(clientId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
-export async function postCodexApproval(endpoint: string, token: string, requestId: string, decision: "accept" | "acceptForSession" | "decline") {
-    await fetchAgentJson(endpoint, token, "/agent/codex/approval", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestId, decision }) });
+export async function postEngineApproval(endpoint: string, token: string, requestId: string, decision: "accept" | "acceptForSession" | "decline") {
+    await fetchAgentJson(endpoint, token, "/agent/agent/approval", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requestId, decision }) });
 }
 
-export async function interruptCodexTurn(endpoint: string, token: string, threadId?: string) {
-    await fetchAgentJson(endpoint, token, "/agent/codex/interrupt", jsonPost({ threadId }));
+export async function interruptEngineTurn(endpoint: string, token: string, threadId?: string) {
+    await fetchAgentJson(endpoint, token, "/agent/agent/interrupt", jsonPost({ threadId }));
 }
 
-export async function acknowledgeCodexHistory(endpoint: string, token: string, threadId: string, turnIds: string[]) {
-    await fetchAgentJson(endpoint, token, "/agent/codex/history/ack", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, turnIds }) });
+export async function acknowledgeEngineHistory(endpoint: string, token: string, threadId: string, turnIds: string[]) {
+    await fetchAgentJson(endpoint, token, "/agent/agent/history/ack", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ threadId, turnIds }) });
 }
 
 export async function revealAgentLocalFile(endpoint: string, token: string, path: string) {
@@ -87,32 +87,32 @@ export function resolveAgentMessageAssetUrl(endpoint: string, token: string, val
     return baseUrl && token ? `${baseUrl}/agent/message-assets/${match[1]}/${match[2]}?token=${encodeURIComponent(token)}` : "";
 }
 
-export function fetchCodexSkills(endpoint: string, token: string, forceReload = false) {
-    return fetchAgentJson<AgentSkillsResponse>(endpoint, token, `/agent/codex/skills${forceReload ? "?forceReload=1" : ""}`);
+export function fetchAgentSkills(endpoint: string, token: string, forceReload = false) {
+    return fetchAgentJson<AgentSkillsResponse>(endpoint, token, `/agent/agent/skills${forceReload ? "?forceReload=1" : ""}`);
 }
 
-export function fetchCodexSkill(endpoint: string, token: string, name: string) {
-    return fetchAgentJson<AgentSkillResponse>(endpoint, token, `/agent/codex/skills/${encodeURIComponent(name)}`);
+export function fetchAgentSkill(endpoint: string, token: string, name: string) {
+    return fetchAgentJson<AgentSkillResponse>(endpoint, token, `/agent/agent/skills/${encodeURIComponent(name)}`);
 }
 
-export function createCodexSkill(endpoint: string, token: string, input: AgentSkillInput) {
-    return fetchAgentJson<AgentSkillResponse>(endpoint, token, "/agent/codex/skills", jsonPost(input));
+export function createAgentSkill(endpoint: string, token: string, input: AgentSkillInput) {
+    return fetchAgentJson<AgentSkillResponse>(endpoint, token, "/agent/agent/skills", jsonPost(input));
 }
 
-export function createCodexSkillDraft(endpoint: string, token: string, input: AgentSkillDraftInput) {
-    return fetchAgentJson<AgentSkillDraftResponse>(endpoint, token, "/agent/codex/skills/draft", jsonPost(input));
+export function createAgentSkillDraft(endpoint: string, token: string, input: AgentSkillDraftInput) {
+    return fetchAgentJson<AgentSkillDraftResponse>(endpoint, token, "/agent/agent/skills/draft", jsonPost(input));
 }
 
-export function updateCodexSkill(endpoint: string, token: string, name: string, input: AgentSkillInput) {
-    return fetchAgentJson<AgentSkillResponse>(endpoint, token, `/agent/codex/skills/${encodeURIComponent(name)}`, jsonPost(input));
+export function updateAgentSkill(endpoint: string, token: string, name: string, input: AgentSkillInput) {
+    return fetchAgentJson<AgentSkillResponse>(endpoint, token, `/agent/agent/skills/${encodeURIComponent(name)}`, jsonPost(input));
 }
 
-export function deleteCodexSkill(endpoint: string, token: string, name: string, expectedRevision: string) {
-    return fetchAgentJson<{ ok?: boolean }>(endpoint, token, `/agent/codex/skills/${encodeURIComponent(name)}/delete`, jsonPost({ expectedRevision }));
+export function deleteAgentSkill(endpoint: string, token: string, name: string, expectedRevision: string) {
+    return fetchAgentJson<{ ok?: boolean }>(endpoint, token, `/agent/agent/skills/${encodeURIComponent(name)}/delete`, jsonPost({ expectedRevision }));
 }
 
-export function setCodexSkillEnabled(endpoint: string, token: string, skill: Pick<AgentSkillSummary, "name" | "path">, enabled: boolean) {
-    return fetchAgentJson<{ ok?: boolean }>(endpoint, token, `/agent/codex/skills/${encodeURIComponent(skill.name)}/enabled`, jsonPost({ ...skill, enabled }));
+export function setAgentSkillEnabled(endpoint: string, token: string, skill: Pick<AgentSkillSummary, "name" | "path">, enabled: boolean) {
+    return fetchAgentJson<{ ok?: boolean }>(endpoint, token, `/agent/agent/skills/${encodeURIComponent(skill.name)}/enabled`, jsonPost({ ...skill, enabled }));
 }
 
 export async function fetchAgentJson<T>(endpoint: string, token: string, path: string, init?: RequestInit) {

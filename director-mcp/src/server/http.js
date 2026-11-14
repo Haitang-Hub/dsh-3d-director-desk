@@ -1,5 +1,6 @@
 /**
- * director-mcp 常驻 HTTP 服务（零依赖；开发态默认 17383、插件托管显式传 STORE_PORT=17372，仅绑 127.0.0.1）。
+ * director-mcp 常驻 HTTP 服务（零依赖；端口统一 17372——开发态与插件托管同端口，
+ * 插件托管仍显式传 STORE_PORT=17372，仅绑 127.0.0.1；STORE_PORT 可覆盖，如自测用 17392）。
  * 一个进程三个角色：
  *   1. 本地文件存储（/kv、/assets，工程数据落盘 data/）
  *   2. 导演台桥（/events SSE、/director/*，工具调用分发给浏览器 executor）
@@ -36,7 +37,7 @@ import { DirectorBridge, ToolError } from "./bridge.js";
 import { handleMethod as handleMcpMethod } from "./mcp.js";
 import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
-const PORT = Number(process.env.STORE_PORT || 17383);
+const PORT = Number(process.env.STORE_PORT || 17372);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
 const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "data"));
 
@@ -54,10 +55,30 @@ const SITE_CANDIDATES = [
 ].filter(Boolean).map((dir) => resolve(dir));
 const SITE_DIR = SITE_CANDIDATES.find((dir) => fs.existsSync(join(dir, "index.html"))) || "";
 
-// token 鉴权：启动时生成随机 token（DIRECTOR_BRIDGE_TOKEN 可固定，便于脚本/自测复用）。
+// token 鉴权：DIRECTOR_BRIDGE_TOKEN 可固定（harness 插件设置配置后经 spawn 注入，脚本/自测复用）；
+// 未固定时生成随机 token 并落盘 data/bridge-token.txt，重启保持不变（插件设置页据此默认填充）。
 // 站点静态资源与探测端点公开，其余端点凭 header x-director-token 或 query ?token= 访问；
 // web 端经 /bootstrap 零配置领取（token 仅下发给本机回环来源，公网探测拿不到）。
-const TOKEN = process.env.DIRECTOR_BRIDGE_TOKEN?.trim() || crypto.randomBytes(18).toString("hex");
+const TOKEN_FILE = join(DATA_DIR, "bridge-token.txt");
+function resolveBridgeToken() {
+    const fixed = process.env.DIRECTOR_BRIDGE_TOKEN?.trim();
+    if (fixed) return fixed;
+    try {
+        const stored = fs.readFileSync(TOKEN_FILE, "utf8").trim();
+        if (stored) return stored;
+    } catch {
+        // 首次启动还没有 token 文件。
+    }
+    const generated = crypto.randomBytes(18).toString("hex");
+    try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        fs.writeFileSync(TOKEN_FILE, `${generated}\n`, { mode: 0o600 });
+    } catch {
+        // 落盘失败不阻断启动，token 仅本次会话有效。
+    }
+    return generated;
+}
+const TOKEN = resolveBridgeToken();
 const LOOPBACK_ORIGIN = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
 // vite 构建产物文件名含内容 hash，可永久缓存的扩展名集合
 const HASHED_ASSET_EXTS = new Set([".js", ".mjs", ".css", ".woff", ".woff2", ".ttf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".mp4", ".webm"]);
@@ -404,6 +425,8 @@ export function startHttpServer() {
     server.listen(PORT, HOST, () => {
         console.log(`[director-mcp] listening on http://${HOST}:${PORT}, data dir: ${DATA_DIR}`);
         console.log(`[director-mcp] bridge protocol v${DIRECTOR_PROTOCOL_VERSION}; MCP stdio: node index.js mcp; self-check: node index.js doctor`);
+        // 手动连接时用户要从运行窗口抄 token；回环网页仍走 /bootstrap 零配置自动领取。
+        console.log(`[director-mcp] connect token: ${TOKEN} (pin via DIRECTOR_BRIDGE_TOKEN; web pages get it from /bootstrap automatically)`);
     });
     return server;
 }

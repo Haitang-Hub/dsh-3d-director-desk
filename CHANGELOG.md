@@ -2,6 +2,20 @@
 
 ## Unreleased
 
++ [变更] 与 Canvas Director 仓库彻底解耦（此前仅剩 URL 级引用）：①版本检查 VERSION/CHANGELOG 改拉本仓库 full 分支（dsh 仓库 main 是发布产物分支、无根 VERSION）；②UI GitHub 链接改指本仓库；③删除 fork 残留的 PLUGIN_REGISTRY_URL 死代码（插件市场概念只属于无限画布，本仓库无消费者）。
++ [变更] 插件设置页「连接 Token」输入框改为密码态（type=password，默认圆点显示，与 API Key 一致）。
+
++ [修复] site_navigate 后紧跟的画布操作偶发落空：SPA 路由切换先卸载旧画布页（canvasContext 清空）再挂载新页，紧跟其后的操作打在上下文空窗期上——site_navigate 跳转画布页时等待上下文就绪（最长 8s）才返回，画布操作在上下文缺位时轮询等待再报错；新增 eventMore.canvasContextNotReady 文案。与无限画布面板同步修复。
++ [变更] 跟随无限画布协议 v8 去 Codex 命名：Agent 面板对话 API 路径 /agent/codex/* → /agent/agent/*，SSE 事件与 hello/health 字段 codex* → engine*，`AGENT_PROTOCOL_VERSION` 7→8，i18n 文案（「Codex 正在整理结果」「等待 Codex 确认权限」等）全部改为 Agent/引擎表述；跨项目连接的桥（canvas-agent 0.6.2+）两侧同步。
++ [修复] AI 助手浮窗的模型下拉「打开后列表空白」：`.director-agent-model-select` 容器的 `overflow: hidden` 把向上伸出的绝对定位菜单（约 100px 高）整块裁掉——DOM 正常渲染、几何位置正确、但画不出来（浏览器实测复现并验证）。改为 `overflow: visible`（触发器自带圆角边框，不受影响），菜单正常显示 Harness 分组与渠道分组。
++ [修复] AI 助手浮窗的 Harness 模型（DSH）分组不再静默消失：此前 listHarnessModels 只在挂载时请求一次，任何瞬时失败（与宿主客户端消息监听器注册赛跑、llm 服务暂未就绪、页面不在 DSH iframe 中打开）都会让整个会话只剩自配渠道且原因不可见——现在窗口聚焦、每次展开模型菜单与每 30s 自动重试，失败原因直接显示在模型菜单里（「Harness 模型不可用：<原因>」）；加载失败期间不再把用户已选的 harness 模型重置为渠道模型。
++ [变更] 移除导演台编辑器顶栏的「AI 桥」状态指示器（DirectorBridgeStatus 组件与 director-bridge-status 样式整体删除）：桥连接完全自动，状态指示不再有操作入口的意义；连接生命周期仍由 use-bridge-store 承载，Agent 面板内行为不变。
++ [变更] 连接设置 UI 全量下线：删除 DirectorBridgeConnectCard（顶栏 AI 桥弹卡：直接运行桥命令框、Local URL/Connect token 输入框、连接/断开按钮）与 Agent 面板「连接本地 Agent」连接视图（方式一插件/方式二直跑引导、Codex 插件提醒），顶栏 AI 桥指示器改为纯状态展示——桥端口统一 17372 后连接完全自动（/bootstrap 零配置发现）。director-mcp 自动生成的 token 落盘 data/bridge-token.txt（重启保持不变；DIRECTOR_BRIDGE_TOKEN 仍最高优先），插件设置页新增「连接 Token」卡片：桥就绪后自动回填当前 token（默认填充），填自定义值并「重启服务」即固定（spawn 注入 DIRECTOR_BRIDGE_TOKEN），清空恢复自动；网页端始终自动领取，无需手动填写。
++ [变更] 桥端口收敛：开发态默认端口 17382→17372，与 Desktop 插件桥统一（2026-11-14 起，撤销 2026-10-31 的双端口错开）——http.js/bridge.js 默认值、mcp.js BRIDGE_URL、web 端 vite 代理与 local-store/use-agent-store/local-agent-panel/use-director-agent-bridge/DirectorBridgeStatus 回退值、start 脚本与 bridge-protocol 文档同步；bridge-selftest 改用独立默认端口 17392（自测会 spawn 自己的桥实例，不再与常驻桥 17372 抢端口），STORE_PORT 仍可覆盖。start 脚本复用逻辑不变：端口已被自家桥占用（插件或开发形态）即直接复用。
++ [新增] 连接设置卡片对齐画布「直接运行 Agent」引导：卡片文案与画布逐句对齐（标题下「本机导演台桥在终端启动后连接。」、「直接运行桥」+ 命令框（`node director-mcp/index.js`，一键复制，项目根目录任意终端可跑）、「默认自动读取 Local URL 和 Connect token，失败时再手动填写。」移至网页连接下方、输入框占位同画布措辞）；桥启动日志打印 connect token（DIRECTOR_BRIDGE_TOKEN 可固定），手动填 token 有出处；插件形态（页面由桥自伺服 17372）隐藏「直接运行桥」区块。
++ [变更] 开发态桥端口 17383→17382（director-mcp 默认值、mcp.js BRIDGE_URL、selftest、web 端 vite 代理与 local-store/use-director-agent-bridge/use-agent-store/local-agent-panel 回退值、start 脚本与 bridge-protocol 文档同步），与画布开发桥 17381 连续编号；Desktop 插件桥仍固定 17372 不受影响。
++ [新增] 编辑器顶栏常驻「AI 桥」状态指示器（对齐无限画布顶栏圆点）：在线绿 / 执行中琥珀脉冲 / 连接中 / 离线灰，点击弹出连接设置卡片——网页连接状态条、Local URL 与 Connect token 输入框（经 /bootstrap 自动发现回填，可手动覆盖，持久化 director-bridge-url / director-bridge-token / director-bridge-enabled）、连接/断开按钮；桥未启动时展示引导提示，纯前端手动编辑不受影响；连接生命周期与执行计数由新增 useBridgeStore 承载，DirectorAgentBridge 无界面桥改为向 store 汇报状态。
+
 + [修复] 桥 0.1.1：harness 内经画布节点「打开导演台」打开的右侧栏标签整体空白并显示 {"ok":false,"error":"invalid token"}——token 豁免清单误把 /director 前缀拉黑，而 /director/editor 正是 web 端 BrowserRouter 的编辑器路由（iframe 深链），落到 token 中间件被拒；移除该前缀（桥本就不伺服 /director/* API），豁免仍有 GET/HEAD、Accept: text/html、非文件路径三重限制兜底。
 
 + [修复] 顶栏小屏响应式整体重构：≤920px 从 grid 换 flex + space-between，全部按钮定宽（flex-shrink: 0）、图标恒定 32px，任何宽度不压缩、不骑压、不遮挡；空间不足按「名称收缩 → 隐藏帮助文档(≤480) → 隐藏名称(≤420) → 视角文字两行(≤400) → 间距收紧(≤340) → 向右溢出兜底」顺序让位；视口工具条小屏改为第二行居中展示；附带修复名称胶囊 nowrap 文本把左列最小宽度撑到全宽导致 425-500px 挤爆顶栏的问题。

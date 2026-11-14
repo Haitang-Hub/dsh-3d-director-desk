@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Eraser, ImagePlus, Magnet, SlidersHorizontal, X, XCircle } from "lucide-react";
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
@@ -181,17 +181,34 @@ function AgentModelRow() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const [open, setOpen] = useState(false);
     const [harnessGroups, setHarnessGroups] = useState<HarnessModelGroup[] | null>(null);
+    const [harnessError, setHarnessError] = useState<string>("");
     const rootRef = useRef<HTMLDivElement>(null);
 
     // Harness 模型（DSH）：面板在宿主 iframe 中时拉取宿主已配置的 provider/模型。
-    // 失败（不在 DSH / 宿主无 llm 服务）静默降级为不自建该分组，菜单里只剩自配渠道。
-    useEffect(() => {
-        let alive = true;
+    // 首次请求可能与宿主客户端的消息监听器注册赛跑，llm 服务也可能暂未就绪——
+    // 只试一次会让整个会话静默降级成只剩自配渠道。这里在窗口聚焦、菜单展开与
+    // 每 30s 重试，并把最近一次失败原因记下来，菜单里明示给用户而不是无声消失。
+    const loadHarnessModels = useCallback(() => {
         listHarnessModels()
-            .then((groups) => { if (alive) setHarnessGroups(groups); })
-            .catch(() => { if (alive) setHarnessGroups([]); });
-        return () => { alive = false; };
+            .then((groups) => {
+                setHarnessGroups(groups);
+                if (groups.length) setHarnessError("");
+            })
+            .catch((error) => {
+                setHarnessGroups((current) => current ?? []);
+                setHarnessError(error instanceof Error ? error.message : String(error));
+            });
     }, []);
+    useEffect(() => {
+        loadHarnessModels();
+        const onFocus = () => loadHarnessModels();
+        window.addEventListener("focus", onFocus);
+        const timer = window.setInterval(loadHarnessModels, 30_000);
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            window.clearInterval(timer);
+        };
+    }, [loadHarnessModels]);
 
     // 只列 text 类模型；渠道里没有标注 text 的模型时整渠道兜底显示（capability 猜测可能不准）
     const textModelsOf = (channel: ModelChannel) => {
@@ -211,14 +228,15 @@ function AgentModelRow() {
     useEffect(() => {
         if (isHarnessValue) {
             if (harnessGroups && !harnessOptions.some((option) => option.value === agentModel)) {
-                updateConfig("textModel", channelOptions[0]?.value || harnessOptions[0]?.value || agentModel);
+                // 已记录 harness 失败（可能是瞬时错误）时不重置选择，等重试成功后保留用户原本的 harness 模型。
+                if (!harnessError) updateConfig("textModel", channelOptions[0]?.value || harnessOptions[0]?.value || agentModel);
             }
             return;
         }
         if (channelOptions.length && !channelOptions.some((option) => option.value === agentModel)) {
             updateConfig("textModel", channelOptions[0].value);
         }
-    }, [agentModel, isHarnessValue, harnessGroups, channelOptions, harnessOptions, updateConfig]);
+    }, [agentModel, isHarnessValue, harnessGroups, harnessError, channelOptions, harnessOptions, updateConfig]);
 
     // 点击外部 / Esc 关闭
     useEffect(() => {
@@ -250,7 +268,10 @@ function AgentModelRow() {
                 aria-label="选择模型"
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                onClick={() => setOpen((value) => !value)}
+                onClick={() => {
+                if (!open) loadHarnessModels();
+                setOpen((value) => !value);
+            }}
             >
                 <span className="director-agent-model-label">{selectedLabel || "未配置模型"}</span>
                 <ChevronDown aria-hidden="true" size={13} className={`director-agent-model-caret${open ? " is-open" : ""}`} />
@@ -276,6 +297,11 @@ function AgentModelRow() {
                                 </button>
                             ))}
                         </>
+                    ) : null}
+                    {harnessGroups !== null && !harnessOptions.length && harnessError ? (
+                        <div className="director-agent-model-empty" title={harnessError}>
+                            Harness 模型不可用：{harnessError}
+                        </div>
                     ) : null}
                     {channelOptions.length ? (
                         <>

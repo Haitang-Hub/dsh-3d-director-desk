@@ -1,10 +1,10 @@
 /**
- * 本地文件存储客户端：读写 local-store 服务（开发态默认 127.0.0.1:17383，插件形态同源 17372）的磁盘数据。
+ * 本地文件存储客户端：读写 local-store 服务（127.0.0.1:17372，开发态与插件形态同端口；页面同源时走 origin）的磁盘数据。
  * 服务不可达时自动降级（调用方回退浏览器存储），可用性结果短暂缓存。
  * 桥启用 token 鉴权后，地址与 token 经 /bootstrap 零配置发现，token 只留在内存。
  */
 
-const DEFAULT_BASE = "http://127.0.0.1:17383";
+const DEFAULT_BASE = "http://127.0.0.1:17372";
 const HEALTH_TIMEOUT_MS = 1500;
 const AVAILABLE_TTL_MS = 30_000;
 

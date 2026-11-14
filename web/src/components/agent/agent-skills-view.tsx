@@ -5,7 +5,7 @@ import { Check, ChevronDown, CircleAlert, FilePenLine, LoaderCircle, LockKeyhole
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
-import { createCodexSkill, createCodexSkillDraft, deleteCodexSkill, fetchCodexSkill, postState, setCodexSkillEnabled, updateCodexSkill, type AgentSkillDetail, type AgentSkillDraft, type AgentSkillInterface, type AgentSkillScope, type AgentSkillSummary } from "@/services/api/canvas-agent";
+import { createAgentSkill, createAgentSkillDraft, deleteAgentSkill, fetchAgentSkill, postState, setAgentSkillEnabled, updateAgentSkill, type AgentSkillDetail, type AgentSkillDraft, type AgentSkillInterface, type AgentSkillScope, type AgentSkillSummary } from "@/services/api/canvas-agent";
 import { useAgentSkillStore } from "@/stores/use-agent-skill-store";
 import { useAgentStore, type AgentChatItem } from "@/stores/use-agent-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -90,7 +90,7 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
     };
     const generateDraft = async (source: SkillDraftSource) => {
         const agent = useAgentStore.getState();
-        if (agent.sending || agent.waiting) return message.warning(t("agent.skillManager.codexBusy"));
+        if (agent.sending || agent.waiting) return message.warning(t("agent.skillManager.engineBusy"));
         if (source === "conversation" && !hasSettledConversation(agent.messages, agent.activeThreadId)) return message.warning(t("agent.skillManager.noConversation"));
         if (source === "canvas" && !agent.canvasContext) return message.warning(t("agent.skillManager.noCanvas"));
         if (!clientId) return message.warning(t("agent.skillManager.connecting"));
@@ -102,7 +102,7 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
                 if (!synced) throw new Error(t("agent.skillManager.syncFailed"));
             }
             if (!connectionIsCurrent(connectionRevision)) return;
-            const response = await createCodexSkillDraft(endpoint, token, {
+            const response = await createAgentSkillDraft(endpoint, token, {
                 source,
                 threadId: agent.activeThreadId,
                 clientId,
@@ -124,7 +124,7 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
         const connectionRevision = useAgentSkillStore.getState().connectionRevision;
         setBusySkill(skill.path);
         try {
-            const response = await fetchCodexSkill(endpoint, token, skill.name);
+            const response = await fetchAgentSkill(endpoint, token, skill.name);
             if (!connectionIsCurrent(connectionRevision)) return;
             if (!response.data) throw new Error(t("agent.skillManager.contentMissing"));
             setEditor({ mode: "edit", detail: response.data });
@@ -158,8 +158,8 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
         setSaving(true);
         try {
             const input = { description: values.description.trim(), instructions: values.instructions.trim(), interface: skillInterface || null };
-            if (editor.mode === "create") await createCodexSkill(endpoint, token, { name, ...input });
-            else await updateCodexSkill(endpoint, token, name, { ...input, expectedRevision: editor.detail.revision });
+            if (editor.mode === "create") await createAgentSkill(endpoint, token, { name, ...input });
+            else await updateAgentSkill(endpoint, token, name, { ...input, expectedRevision: editor.detail.revision });
             if (!connectionIsCurrent(connectionRevision)) return;
             setDraft(null);
             setEditor(null);
@@ -185,10 +185,10 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
                 if (!connectionIsCurrent(connectionRevision)) return;
                 setBusySkill(skill.path);
                 try {
-                    const response = await fetchCodexSkill(endpoint, token, skill.name);
+                    const response = await fetchAgentSkill(endpoint, token, skill.name);
                     if (!connectionIsCurrent(connectionRevision)) return;
                     if (!response.data) throw new Error(t("agent.skillManager.contentMissing"));
-                    await deleteCodexSkill(endpoint, token, skill.name, response.data.revision);
+                    await deleteAgentSkill(endpoint, token, skill.name, response.data.revision);
                     if (!connectionIsCurrent(connectionRevision)) return;
                     if (selectedSkill?.name === skill.name && selectedSkill.path === skill.path) clearSelection();
                     await refresh();
@@ -212,7 +212,7 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
         if (!connectionIsCurrent(connectionRevision)) return;
         setBusySkill(skill.path);
         try {
-            await setCodexSkillEnabled(endpoint, token, skill, enabled);
+            await setAgentSkillEnabled(endpoint, token, skill, enabled);
             if (!connectionIsCurrent(connectionRevision)) return;
             if (!enabled && selectedSkill?.name === skill.name && selectedSkill.path === skill.path) clearSelection();
             await refresh();
@@ -222,28 +222,28 @@ export function AgentSkillsView({ clientId }: { clientId: string }) {
             if (connectionIsCurrent(connectionRevision)) setBusySkill("");
         }
     };
-    const codexBusy = sending || waiting;
+    const engineBusy = sending || waiting;
     const createMenu: MenuProps = {
         items: [
             {
                 key: "conversation",
                 icon: <MessageSquareText className="size-4" />,
-                disabled: codexBusy || !hasConversation,
+                disabled: engineBusy || !hasConversation,
                 label: (
                     <div className="py-0.5">
                         <div className="text-sm">{t("agent.skillManager.fromConversation")}</div>
-                        <div className="mt-0.5 text-xs" style={{ color: theme.node.muted }}>{t(codexBusy ? "agent.skillManager.availableAfterRun" : hasConversation ? "agent.skillManager.conversationDescription" : activeThreadId ? "agent.skillManager.noCompletedContent" : "agent.skillManager.startConversation")}</div>
+                        <div className="mt-0.5 text-xs" style={{ color: theme.node.muted }}>{t(engineBusy ? "agent.skillManager.availableAfterRun" : hasConversation ? "agent.skillManager.conversationDescription" : activeThreadId ? "agent.skillManager.noCompletedContent" : "agent.skillManager.startConversation")}</div>
                     </div>
                 ),
             },
             {
                 key: "canvas",
                 icon: <Workflow className="size-4" />,
-                disabled: codexBusy || !hasCanvas,
+                disabled: engineBusy || !hasCanvas,
                 label: (
                     <div className="py-0.5">
                         <div className="text-sm">{t("agent.skillManager.fromCanvas")}</div>
-                        <div className="mt-0.5 text-xs" style={{ color: theme.node.muted }}>{t(codexBusy ? "agent.skillManager.availableAfterRun" : hasCanvas ? "agent.skillManager.canvasDescription" : "agent.skillManager.canvasUnavailable")}</div>
+                        <div className="mt-0.5 text-xs" style={{ color: theme.node.muted }}>{t(engineBusy ? "agent.skillManager.availableAfterRun" : hasCanvas ? "agent.skillManager.canvasDescription" : "agent.skillManager.canvasUnavailable")}</div>
                     </div>
                 ),
             },

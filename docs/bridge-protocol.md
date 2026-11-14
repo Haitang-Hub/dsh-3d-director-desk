@@ -3,14 +3,14 @@
 3D 导演台（本仓库）与 infinite-canvas（canvas-agent）共享同一套桥协议设计，两边各自
 维护一份实现（刻意不共享代码，保证项目独立）。**格式变更时两边同步递增版本号。**
 
-- `protocolVersion`（当前 **7**）：hello 事件携带，executor 不一致时主动断开。
+- `protocolVersion`（当前 **8**）：hello 事件携带，executor 不一致时主动断开。
 - `dv`（当前 **6**）：executor 桥实现版本，服务端多页面同时在线时优先路由到最新版本。
 
 ## 角色
 
 - **executor**：导演台编辑器页面（`web/src/pages/director/editor`），挂载
   `DirectorAgentBridge`，以 `role=director` 接入 SSE，真正执行 stage/camera/preview 工具。
-- **桥**：`director-mcp/`（插件托管端口 17372、开发态默认 17383，仅绑 127.0.0.1），管理 executor 注册表，
+- **桥**：`director-mcp/`（端口统一 17372：开发态与插件托管同端口，`STORE_PORT` 可覆盖，仅绑 127.0.0.1），管理 executor 注册表，
   接收 MCP/HTTP 工具调用并路由、计时、审计。
 - **调用方**：MCP stdio 门面（`node director-mcp/index.js mcp`）或直接 HTTP
   `POST /director/tool`。

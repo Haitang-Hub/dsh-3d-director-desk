@@ -12,6 +12,7 @@ import { CanvasImportPanel } from "./editor/panels/CanvasImportPanel";
 import { ProjectDirectoryPanel } from "./editor/panels/ProjectDirectoryPanel";
 import { DirectorAgentChatPanel, DirectorAgentChatToggle } from "./editor/agent/DirectorAgentChatPanel";
 import {
+  broadcastDirectorDeskRegistry,
   clearDirectorDeskHostBridge,
   initDirectorDeskHostBridge,
   postDirectorDeskMessageToHost,
@@ -80,6 +81,7 @@ function DirectorDeskNameField({ desks, activeDeskId, onChange }: { desks: Direc
     if (name && active && name !== active.name) {
       const records = desks.map((desk) => (desk.id === active.id ? { ...desk, name, updatedAt: new Date().toISOString() } : desk));
       writeDirectorDeskRecords(records);
+      broadcastDirectorDeskRegistry();
       onChange(records);
     }
     setEditing(false);
@@ -150,6 +152,8 @@ export default function DirectorEditorPage() {
     setDirectorDeskView({ records: nextRecords, activeDeskId: id });
     writeActiveDirectorDeskId(id);
     useDirectorStore.getState().openScopedScene(id);
+    // 打开/自动创建工程后向画布同步注册表（新建工程的顺序中文名也随这次广播出去）
+    broadcastDirectorDeskRegistry();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlInstanceId, benchmarkMode]);
 

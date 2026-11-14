@@ -3,7 +3,7 @@
  * 只实现 initialize / tools/list / tools/call / ping 四个方法 —— 工具面固定、协议子集小；
  * 若 harness 要求 progress notification 等完整能力，再切换到 @modelcontextprotocol/sdk。
  *
- * 工具执行不在本进程：POST 到常驻桥（开发态 17383 /director/tool），由桥路由给浏览器 executor。
+ * 工具执行不在本进程：POST 到常驻桥（默认 17372 /director/tool），由桥路由给浏览器 executor。
  * stdin/stdout 只跑 JSON-RPC，日志一律走 stderr。
  */
 
@@ -11,7 +11,7 @@ import { mcpToolList } from "../schema/tools.js";
 import { SERVER_NAME, SERVER_VERSION } from "../protocol.js";
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
-const BRIDGE_URL = (process.env.DIRECTOR_BRIDGE_URL || "http://127.0.0.1:17383").replace(/\/$/, "");
+const BRIDGE_URL = (process.env.DIRECTOR_BRIDGE_URL || "http://127.0.0.1:17372").replace(/\/$/, "");
 const DESK = process.env.DIRECTOR_DESK || "";
 
 /** 启动 stdio MCP 服务。 */

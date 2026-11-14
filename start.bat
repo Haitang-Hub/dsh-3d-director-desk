@@ -40,17 +40,17 @@ if not exist "%WEB_DIR%\node_modules" (
 echo Starting services...
 echo.
 
-:: 1. director-mcp (dev port 17383; Desktop plugin bridge keeps 17372)
-:: Verify /health identity before starting/reusing: a foreign service squatting 17383
+:: 1. director-mcp (port 17372; dev and Desktop plugin share one port, healthy bridge is reused)
+:: Verify /health identity before starting/reusing: a foreign service squatting 17372
 :: must not make us blindly spawn a second bridge that dies with EADDRINUSE.
-netstat -ano | findstr /r ":17383 .*LISTENING" >nul 2>nul && (
-    curl -s -m 2 http://127.0.0.1:17383/health 2>nul | findstr "director-desk" >nul 2>nul && (
-        echo [OK] director-mcp 17383 already listening - reusing it
+netstat -ano | findstr /r ":17372 .*LISTENING" >nul 2>nul && (
+    curl -s -m 2 http://127.0.0.1:17372/health 2>nul | findstr "director-desk" >nul 2>nul && (
+        echo [OK] director-mcp 17372 already listening (dev or plugin) - reusing it
     ) || (
-        echo [ERR] port 17383 is occupied by another service ^(not director-mcp^) - bridge not started
+        echo [ERR] port 17372 is occupied by another service ^(not director-mcp^) - bridge not started
     )
 ) || (
-    start "director-mcp 17383" cmd /k "pushd "%MCP_DIR%" && set STORE_PORT=17383&& node index.js"
+    start "director-mcp 17372" cmd /k "pushd "%MCP_DIR%" && set STORE_PORT=17372&& node index.js"
     echo [OK] director-mcp started
 )
 

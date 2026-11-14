@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * director-mcp：3D 导演台的常驻本地服务（零依赖，端口 17372）。
+ * director-mcp：3D 导演台的常驻本地服务（零依赖，端口统一 17372：开发态与插件托管同端口，STORE_PORT 可覆盖）。
  *
  *   node index.js          常驻 HTTP 服务：本地文件存储（/kv、/assets）+ 导演台桥（/events、/director/*）
  *   node index.js mcp      stdio MCP 门面（DeepSeek harness 经此接入，工具调用转发到常驻桥）

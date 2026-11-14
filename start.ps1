@@ -13,7 +13,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 }
 
 # 端口在听不代表是我们家的桥——curl /health 核对 plugin 身份字段，
-# 防止其它进程占着 17383 时仍盲目启动导致 EADDRINUSE。
+# 防止其它进程占着 17372 时仍盲目启动导致 EADDRINUSE。
 function Test-BridgeHealth([int]$Port, [string]$Plugin) {
     try {
         $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
@@ -38,15 +38,16 @@ if (-not (Test-Path "$webDir/node_modules")) {
 
 Write-Host "Starting services..." -ForegroundColor Cyan
 
-# 1. director-mcp (dev port 17383; Desktop plugin bridge keeps 17372) - local storage + director bridge
-if (Get-NetTCPConnection -LocalPort 17383 -State Listen -ErrorAction SilentlyContinue) {
-    if (Test-BridgeHealth 17383 "director-desk") {
-        Write-Host "  director-mcp 17383 already listening - reusing it" -ForegroundColor Green
+# 1. director-mcp (port 17372; dev and Desktop plugin share one port) - local storage + director bridge
+# Since 2026-11-14 dev and plugin bridges use the same port; an already-listening healthy bridge is reused.
+if (Get-NetTCPConnection -LocalPort 17372 -State Listen -ErrorAction SilentlyContinue) {
+    if (Test-BridgeHealth 17372 "director-desk") {
+        Write-Host "  director-mcp 17372 already listening (dev or plugin) - reusing it" -ForegroundColor Green
     } else {
-        Write-Host "[ERR] port 17383 is occupied by another service (not director-mcp) - bridge not started" -ForegroundColor Red
+        Write-Host "[ERR] port 17372 is occupied by another service (not director-mcp) - bridge not started" -ForegroundColor Red
     }
 } else {
-    Start-Process cmd -ArgumentList '/k', 'title director-mcp 17383 && set STORE_PORT=17383&& node index.js' -WorkingDirectory $mcpDir
+    Start-Process cmd -ArgumentList '/k', 'title director-mcp 17372 && set STORE_PORT=17372&& node index.js' -WorkingDirectory $mcpDir
     Write-Host "  director-mcp started" -ForegroundColor Green
 }
 

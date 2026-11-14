@@ -2123,13 +2123,9 @@
     max-width: none;
   }
 
-  /* 名称优先吃剩余宽度（省略号）。flex-basis 必须是 0 而非 auto：
-     basis auto 时名称按整段文本宽度参与收缩分配，极窄区间接连挤爆顶栏；
-     basis 0 + min-width 0 + overflow hidden 让它可平滑收缩到 0 */
+  /* 名称保持内容宽度完整显示（方正矩形，不再收缩省略），极窄区间整体隐藏见 ≤420px 规则 */
   .app-shell .top-bar-left .director-desk-name {
-    flex: 1 1 0%;
-    min-width: 0;
-    overflow: hidden;
+    flex: 0 0 auto;
     padding: 0 8px;
   }
 
@@ -2336,12 +2332,11 @@
 .app-shell .director-desk-name {
   display: inline-flex;
   align-items: center;
-  min-width: 0;
-  max-width: 100%;
+  flex: 0 0 auto;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgb(var(--border-rgb) / 0.28);
-  border-radius: 10px;
+  border-radius: 4px;
   background: rgb(var(--field-rgb) / 0.6);
   color: rgb(var(--text-rgb));
   font-size: 13px;
@@ -2353,8 +2348,6 @@
 }
 
 .app-shell .director-desk-name-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -2368,7 +2361,7 @@
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgb(var(--accent-rgb) / 0.9);
-  border-radius: 10px;
+  border-radius: 4px;
   background: rgb(var(--field-rgb));
   color: rgb(var(--text-rgb));
   font-size: 13px;
@@ -2604,6 +2597,74 @@
   color: rgb(255 255 255 / 0.45);
 }
 
+/* 工程删除确认气泡：覆写为与所在 .dproj-modal 完全一致的深色主题（同底色、描边、圆角、按钮）。
+   选择器要叠够优先级：antd cssinjs 生成 .css-xxx.ant-popover .ant-popover-inner 这类带哈希类的
+   三段选择器（0,3,0），普通两段覆写压不过，这里统一用重复类名提到 (0,4,0)。 */
+.dproj-popconfirm.dproj-popconfirm.dproj-popconfirm .ant-popover-inner {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #0b0e15, #06080d);
+  box-shadow:
+    0 24px 80px rgb(0 0 0 / 0.65),
+    0 0 0 1px rgb(0 0 0 / 0.5),
+    0 0 60px rgb(77 143 248 / 0.07);
+  padding: 14px 16px;
+}
+
+.dproj-popconfirm.dproj-popconfirm.dproj-popconfirm .ant-popover-arrow::before {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: #070a10;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-message-icon {
+  color: rgb(238 178 88);
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-title {
+  color: rgb(255 255 255 / 0.92);
+  font-weight: 650;
+  font-size: 14px;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons {
+  margin-top: 12px;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 560;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-default {
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(255 255 255 / 0.85);
+  box-shadow: none;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-default:hover {
+  border-color: rgb(77 143 248 / 0.55) !important;
+  background: rgb(77 143 248 / 0.16) !important;
+  color: rgb(255 255 255 / 0.95) !important;
+}
+
+/* 删除按钮：对齐工程目录里 .dproj-row-button.is-danger 的危险描边风格 */
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous {
+  border-color: rgb(226 82 82 / 0.6);
+  background: rgb(226 82 82 / 0.12);
+  box-shadow: none;
+  color: #ff8f8f;
+}
+
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover {
+  border-color: rgb(226 82 82 / 0.85) !important;
+  background: rgb(226 82 82 / 0.22) !important;
+  color: #ffb3b3 !important;
+}
+
 /* 窄面板隐藏视口坐标指示器（XYZ 彩色节点，alignment center-center 常驻画布中部），
    避免与顶部工具条和场景内容重叠 */
 @media (max-width: 1200px) {
@@ -2611,3 +2672,4 @@
     display: none;
   }
 }
+

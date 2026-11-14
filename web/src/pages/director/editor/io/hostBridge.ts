@@ -1,4 +1,5 @@
 import { useDirectorStore } from "../store/directorStore";
+import { readDirectorDeskRecords } from "../workspaces/directorDeskRegistry";
 import {
   DIRECTOR_EXTENSION_PROTOCOL_VERSION,
   DIRECTOR_EXTENSION_REQUEST_TYPE,
@@ -153,6 +154,15 @@ export function postDirectorDeskMessageToHost(message: DirectorDeskTransportMess
   if (postTauriDirectorHostMessage(message)) return;
   const target = window.opener ?? window.parent;
   target?.postMessage(message, getDirectorDeskHostOrigin());
+}
+
+/** 工程注册表 → 宿主（DSH 面板页）→ 画布节点：名称同步的唯一出口。 */
+export const DIRECTOR_DESK_REGISTRY_SYNC_TYPE = "storyai:director-desk-registry-sync";
+const DIRECTOR_DESK_REGISTRY_QUERY_TYPE = "storyai:director-desk-registry-query";
+
+export function broadcastDirectorDeskRegistry() {
+  const desks = readDirectorDeskRecords().map((record) => ({ id: record.id, name: record.name }));
+  postDirectorDeskMessageToHost({ type: DIRECTOR_DESK_REGISTRY_SYNC_TYPE, payload: { desks } });
 }
 
 function postDirectorExtensionResponse(payload: DirectorExtensionResponsePayload) {
@@ -407,6 +417,15 @@ function handleHostMessage(event: MessageEvent) {
   handleHostProtocolMessage(event.data as DirectorDeskTransportMessage);
 }
 
+// 工程注册表查询：来自 DSH 面板页（导演台插件客户端经 BroadcastChannel 转发，origin 是宿主
+// 而非本应用，不能走 isAllowedHostEvent），只认父窗口来源。
+function handleRegistryQuery(event: MessageEvent) {
+  if (event.source !== window.parent) return;
+  const data = event.data as { type?: string } | null;
+  if (data?.type !== DIRECTOR_DESK_REGISTRY_QUERY_TYPE) return;
+  broadcastDirectorDeskRegistry();
+}
+
 export function initDirectorDeskHostBridge() {
   if (initialized) {
     return;
@@ -415,6 +434,7 @@ export function initDirectorDeskHostBridge() {
   initialized = true;
   applyDirectorDeskTheme(getInitialHostTheme() ?? "dark");
   window.addEventListener("message", handleHostMessage);
+  window.addEventListener("message", handleRegistryQuery);
   void initTauriDirectorHostTransport(handleHostProtocolMessage).then((cleanup) => {
     if (!cleanup) return;
     if (!initialized) {
@@ -433,6 +453,7 @@ export function clearDirectorDeskHostBridge() {
   initialized = false;
   activeExtensionExportRequestId = null;
   window.removeEventListener("message", handleHostMessage);
+  window.removeEventListener("message", handleRegistryQuery);
   clearTauriTransport?.();
   clearTauriTransport = null;
 }

@@ -10,10 +10,10 @@ const webDir = dirname(fileURLToPath(import.meta.url));
 const localVersion = readFileSync(resolve(webDir, "../VERSION"), "utf8").trim() || "dev";
 const localChangelog = readFileSync(resolve(webDir, "../CHANGELOG.md"), "utf8");
 
-// Dev-态同源化：把 director-mcp 桥的 API 前缀代理到开发桥（17383，与 Desktop 插件桥 17372 错开），
+// Dev-态同源化：把 director-mcp 桥的 API 前缀代理到本机桥（17372，开发态与插件桥同端口），
 // 让 5080 页面与插件托管形态一样同源连桥。/director 只精确代理 ready/result 两个桥端点，
 // /director/editor 等 SPA 路由保持本地；/canvas/result 是写给旧画布桥的兼容回退路径。
-const DEV_BRIDGE_TARGET = process.env.DEV_BRIDGE_ORIGIN?.trim() || "http://127.0.0.1:17383";
+const DEV_BRIDGE_TARGET = process.env.DEV_BRIDGE_ORIGIN?.trim() || "http://127.0.0.1:17372";
 const DEV_BRIDGE_PROXY = {
     "/bootstrap": DEV_BRIDGE_TARGET,
     "/health": DEV_BRIDGE_TARGET,

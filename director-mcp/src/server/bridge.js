@@ -14,7 +14,7 @@ import { DIRECTOR_PROTOCOL_VERSION } from "../protocol.js";
 const HEARTBEAT_MS = 15_000;
 const AUDIT_SUMMARY_MAX = 500;
 // 桥监听端口（与 http.js 同口径）：站点由桥托管，executor 页面地址随端口动态拼出
-const PORT = Number(process.env.STORE_PORT || 17383);
+const PORT = Number(process.env.STORE_PORT || 17372);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
 
 /** 带结构化码的工具调用错误：HTTP/MCP 门面按此序列化给 harness。 */

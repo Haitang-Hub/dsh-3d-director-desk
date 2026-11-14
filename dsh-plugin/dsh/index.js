@@ -15,7 +15,8 @@
 
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import Schema from '@deepseek-ai/schemastery'
@@ -357,18 +358,50 @@ export async function apply(ctx, config) {
     restarts: 0,
   }
 
-  // 共享设置（本项目自己的设置页）：这里只取本项目的运行期开关。
+  // 共享设置（本项目自己的设置页）：这里只取本项目的运行期开关与连接 token。
   // 读取失败按默认开启处理，设置文件损坏不应该拦住桥的启动。
   const settingsPath = sharedSettingsPath(config.root)
   let autoStart = true
   let autoRestart = true
+  // 连接 token：设置里留空 = 自动（桥自己生成并经 /bootstrap 下发）；填写则 spawn 时注入固定值。
+  let bridgeToken = ''
   try {
     const shared = await readSharedSettings(config.root)
     const switches = projectSwitches(shared, 'director-desk')
     autoStart = switches.autoStart
     autoRestart = switches.autoRestart
+    bridgeToken = String(shared.projects?.['director-desk']?.bridgeToken || '').trim()
   } catch (error) {
     ctx.logger.warn('director-desk: read shared settings failed: %s', error instanceof Error ? error.message : String(error))
+  }
+
+  /** 读桥当前生效的 token：先看桥落盘的 data/bridge-token.txt，再经 /bootstrap 领（覆盖复用外部桥的场景）。 */
+  async function discoverBridgeToken() {
+    try {
+      const token = (await readFile(join(config.root, 'bridge-token.txt'), 'utf8')).trim()
+      if (token) return token
+    } catch { /* 桥还没写过 token 文件 */ }
+    try {
+      const response = await fetch(`${baseUrl}/bootstrap`, { signal: AbortSignal.timeout(2000) })
+      const payload = await response.json().catch(() => null)
+      return String(payload?.token || '').trim()
+    } catch { return '' }
+  }
+
+  /** 设置里未固定 token 时，把桥当前 token 回填到共享设置，设置页打开即见（默认填充）。 */
+  async function fillBridgeTokenIfEmpty() {
+    if (bridgeToken) return
+    const token = await discoverBridgeToken()
+    if (!token) return
+    bridgeToken = token
+    try {
+      await updateSharedSettings(config.root, {
+        projects: { 'director-desk': { bridgeToken: token, updatedAt: Date.now() } },
+      })
+      ctx.logger.info('director-desk: bridge token filled into shared settings')
+    } catch (error) {
+      ctx.logger.warn('director-desk: bridge token fill failed: %s', error instanceof Error ? error.message : String(error))
+    }
   }
 
   /** 面板读取的稳定快照：只含可 JSON 化的状态，不含子进程句柄。 */
@@ -402,6 +435,9 @@ export async function apply(ctx, config) {
         // 显式传站点目录：不依赖桥内部按相对路径上溯的猜测（仓库布局与打包布局层数不同）
         DIRECTOR_SITE_DIR: siteDir,
         STORE_PORT: String(config.port),
+        // 设置里固定了连接 token 时注入（DIRECTOR_BRIDGE_TOKEN 优先于桥落盘的 token；
+        // scrubbedEnv 会先清掉环境里的 *TOKEN*，这里再写入我们自己的）。
+        ...(bridgeToken ? { DIRECTOR_BRIDGE_TOKEN: bridgeToken } : {}),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -428,6 +464,7 @@ export async function apply(ctx, config) {
       await waitForHealth(`${baseUrl}/health`, config.startupTimeoutMs, undefined)
       state.ready = true
       state.error = undefined
+      await fillBridgeTokenIfEmpty()
       return true
     } catch (error) {
       const cause = spawnError ? `spawn failed: ${spawnError.message}` : error.message
@@ -464,6 +501,7 @@ export async function apply(ctx, config) {
         if (!state.ready) ctx.logger.info('director-desk: reusing healthy bridge; url=%s', baseUrl)
         state.ready = true
         state.error = undefined
+        await fillBridgeTokenIfEmpty()
         return
       }
       state.ready = false
@@ -530,6 +568,8 @@ export async function apply(ctx, config) {
     const startTurnedOff = autoStart && !nextStart
     autoStart = nextStart
     autoRestart = nextRestart
+    // token 修改在下次 spawn（重启服务）时生效；清空则回落为桥自动 token。
+    bridgeToken = String(settings?.projects?.['director-desk']?.bridgeToken || '').trim()
     if (startTurnedOff) {
       if (state.child) {
         try { state.child.kill() } catch { /* 已经退出 */ }

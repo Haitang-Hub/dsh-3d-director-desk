@@ -10,6 +10,8 @@ import "@/i18n";
 import { initAnalytics } from "@/lib/analytics";
 import { initMirrorAvailability } from "@/lib/mirrored-storage";
 import { initDshSettingsBridge } from "@/lib/dsh-settings-bridge";
+// 编辑器页是懒加载的；提前求值 Harness 桥，让面板 iframe 里的同源中继在新窗口发请求前就位。
+import "@/pages/director/editor/agent/harnessModels";
 import { hydrateLocalStorageFromStore } from "@/services/local-store";
 import { router } from "@/router";
 

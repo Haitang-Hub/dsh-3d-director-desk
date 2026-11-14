@@ -201,9 +201,10 @@ export function ensureDirectorDeskRecordForId(records: DirectorDeskRecord[], id:
   if (existing) return { records, record: existing };
 
   const timestamp = nowIso();
+  // 画布侧 mint 的 desk-<uuid> 锚点统一给中文顺序名，不再把 id 当名字显示。
   const record: DirectorDeskRecord = {
     id,
-    name: id.startsWith(DIRECTOR_DESK_ID_PREFIX) ? `导演台 ${id.slice(DIRECTOR_DESK_ID_PREFIX.length)} 号` : id,
+    name: `导演台 ${getNextDirectorDeskNumber(records)} 号`,
     createdAt: timestamp,
     updatedAt: timestamp,
   };

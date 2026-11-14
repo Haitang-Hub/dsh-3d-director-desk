@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { useBridgeStore } from "@/stores/use-bridge-store";
 import { createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { uploadMediaFile } from "@/services/file-storage";
@@ -72,10 +73,10 @@ export type DirectorToolInput = {
 const DIRECTOR_AGENT_PROTOCOL_VERSION = 7;
 /** 桥实现版本：服务端在多个导演台页面同时连接时优先路由到最新版本。 */
 const DIRECTOR_BRIDGE_VERSION = 8;
-/** 本项目自有桥（director-mcp 开发态 17383，插件形态 17372）的兜底地址；自动发现失败即保持纯前端可用。 */
-export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17383";
+/** 本项目自有桥（director-mcp，开发态与插件形态统一 17372）的兜底地址；自动发现失败即保持纯前端可用。 */
+export const DIRECTOR_BRIDGE_DEFAULT_ENDPOINT = "http://127.0.0.1:17372";
 
-/** 桥端点候选：同源优先（插件形态桥自伺服页面 / dev 态 vite 代理到 17383），其次本机固定端口。 */
+/** 桥端点候选：同源优先（插件形态桥自伺服页面 / dev 态 vite 代理到 17372），其次本机固定端口。 */
 function directorBridgeCandidates(): string[] {
     const candidates: string[] = [];
     try {
@@ -112,7 +113,11 @@ async function fetchDirectorBootstrap(candidate: string, fallbackToken: string):
 async function resolveDirectorBridge(): Promise<{ endpoint: string; token: string } | null> {
     const storedEndpoint = (localStorage.getItem("director-bridge-url") || "").replace(/\/$/, "");
     const storedToken = localStorage.getItem("director-bridge-token") || "";
-    if (storedEndpoint && storedToken) return { endpoint: storedEndpoint, token: storedToken };
+    if (storedEndpoint && storedToken) {
+        // 桥的 token 每次启动随机生成，存储值可能已过期：先向存储端点刷新 /bootstrap，拿不到再退回存储值。
+        const refreshed = await fetchDirectorBootstrap(storedEndpoint, storedToken);
+        return refreshed || { endpoint: storedEndpoint, token: storedToken };
+    }
     for (const candidate of directorBridgeCandidates()) {
         const bridge = await fetchDirectorBootstrap(candidate, storedToken);
         if (bridge) return bridge;
@@ -142,54 +147,88 @@ export async function probeDirectorBridge(): Promise<{ online: boolean; protocol
 /**
  * 导演台页面与本机 director-mcp 桥的无界面桥：以 director 角色接入 SSE，
  * 接收 stage / camera / preview 工具调用，直接驱动导演台 store 与导出器执行。
+ * 连接生命周期与顶栏状态指示器经 useBridgeStore 共享（在线/离线/执行中）。
  */
 export function DirectorAgentBridge() {
     const clientIdRef = useRef(`director-${Math.random().toString(36).slice(2, 10)}`);
+    const enabled = useBridgeStore((state) => state.enabled);
+    const epoch = useBridgeStore((state) => state.epoch);
 
+    // 仅监听 enabled/epoch：URL/token 的修改由连接设置层统一 bump epoch 触发重连，
+    // 避免自动回填 discovered 端点时自我触发重连循环。
     useEffect(() => {
+        if (!enabled) return;
         const clientId = clientIdRef.current;
         let disposed = false;
         let source: EventSource | null = null;
+        let retryTimer: number | null = null;
 
-        void resolveDirectorBridge().then((bridge) => {
-            if (!bridge || disposed) return;
-            const { endpoint, token } = bridge;
-            source = new EventSource(`${endpoint}/events?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}&role=director&dv=${DIRECTOR_BRIDGE_VERSION}&desk=${encodeURIComponent(new URLSearchParams(window.location.search).get("instanceId") || "")}`);
-
-            // 编辑器完全加载后上报就绪；未就绪的窗口不参与导演台工具路由。
-            const reportReady = () => {
-                const deskId = new URLSearchParams(window.location.search).get("instanceId") || "";
-                void fetch(`${endpoint}/director/ready?token=${encodeURIComponent(token)}`, {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ clientId, deskId }),
-                }).catch(() => undefined);
-            };
-            reportReady();
-            source.addEventListener("hello", (event) => {
-                const hello = parseData(event);
-                if (!hello || disposed) return;
-                if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) {
-                    source?.close();
+        const connect = () => {
+            if (disposed) return;
+            useBridgeStore.getState().setBridgeState({ status: "connecting" });
+            void resolveDirectorBridge().then((bridge) => {
+                if (disposed) return;
+                if (!bridge) {
+                    // 桥未启动：保持纯前端可用，稍后自动重试（对齐画布 SSE 自动重连语义）
+                    retryTimer = window.setTimeout(connect, 4000);
                     return;
                 }
-                // ready 状态挂在单次 SSE 连接上，断线自动重连后会随旧连接丢失；hello 每次建连都下发，借此重新上报
+                // 自动发现的端点/token 回填到 store（连接设置里可见；不回写 localStorage 之外的任何东西）
+                const store = useBridgeStore.getState();
+                if (store.endpoint !== bridge.endpoint || store.token !== bridge.token) {
+                    store.setBridgeState({ endpoint: bridge.endpoint, token: bridge.token });
+                }
+                source = new EventSource(`${bridge.endpoint}/events?token=${encodeURIComponent(bridge.token)}&clientId=${encodeURIComponent(clientId)}&role=director&dv=${DIRECTOR_BRIDGE_VERSION}&desk=${encodeURIComponent(new URLSearchParams(window.location.search).get("instanceId") || "")}`);
+
+                // 编辑器完全加载后上报就绪；未就绪的窗口不参与导演台工具路由。
+                const reportReady = () => {
+                    const deskId = new URLSearchParams(window.location.search).get("instanceId") || "";
+                    void fetch(`${bridge.endpoint}/director/ready?token=${encodeURIComponent(bridge.token)}`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ clientId, deskId }),
+                    }).catch(() => undefined);
+                };
                 reportReady();
+                source.addEventListener("hello", (event) => {
+                    const hello = parseData(event);
+                    if (!hello || disposed) return;
+                    if (Number(hello.protocolVersion) !== DIRECTOR_AGENT_PROTOCOL_VERSION) {
+                        source?.close();
+                        useBridgeStore.getState().setBridgeState({ status: "offline" });
+                        return;
+                    }
+                    useBridgeStore.getState().setBridgeState({ status: "online" });
+                    // ready 状态挂在单次 SSE 连接上，断线自动重连后会随旧连接丢失；hello 每次建连都下发，借此重新上报
+                    reportReady();
+                });
+                source.addEventListener("error", () => {
+                    // EventSource 会自动重连；断线期间状态显示为 connecting
+                    if (!disposed && useBridgeStore.getState().enabled) useBridgeStore.getState().setBridgeState({ status: "connecting" });
+                });
+                source.addEventListener("tool_call", (event) => {
+                    const payload = parseData(event) as { requestId?: string; name?: string; input?: DirectorToolInput } | null;
+                    if (!payload?.requestId || !payload.name) return;
+                    const store = useBridgeStore.getState();
+                    store.setBridgeState({ executing: store.executing + 1 });
+                    void runDirectorTool(payload.name, payload.input || {})
+                        .then((result) => postResult(bridge.endpoint, bridge.token, clientId, payload.requestId!, { result }))
+                        .catch((error) => postResult(bridge.endpoint, bridge.token, clientId, payload.requestId!, { error: error instanceof Error ? error.message : String(error) }))
+                        .finally(() => {
+                            const current = useBridgeStore.getState();
+                            current.setBridgeState({ executing: Math.max(0, current.executing - 1) });
+                        });
+                });
             });
-            source.addEventListener("tool_call", (event) => {
-                const payload = parseData(event) as { requestId?: string; name?: string; input?: DirectorToolInput } | null;
-                if (!payload?.requestId || !payload.name) return;
-                void runDirectorTool(payload.name, payload.input || {})
-                    .then((result) => postResult(endpoint, token, clientId, payload.requestId!, { result }))
-                    .catch((error) => postResult(endpoint, token, clientId, payload.requestId!, { error: error instanceof Error ? error.message : String(error) }));
-            });
-        });
+        };
+        connect();
 
         return () => {
             disposed = true;
+            if (retryTimer !== null) window.clearTimeout(retryTimer);
             source?.close();
         };
-    }, []);
+    }, [enabled, epoch]);
 
     return null;
 }

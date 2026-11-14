@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ChangeEvent } from "react";
 import { Download, FolderOpen, Plus, Trash2, Upload, X } from "lucide-react";
+import { Popconfirm } from "antd";
 import { mirroredLocalStorage } from "@/lib/mirrored-storage";
 import {
   createDirectorDeskRecord,
@@ -7,6 +8,7 @@ import {
   getDirectorDeskNumber,
   type DirectorDeskRecord,
 } from "../workspaces/directorDeskRegistry";
+import { broadcastDirectorDeskRegistry } from "../io/hostBridge";
 import { parseProject } from "../io/importProjectJson";
 import { serializeProject } from "../io/exportProjectJson";
 import { isDirectorProjectShape } from "../io/projectDocument";
@@ -99,6 +101,7 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
     const record = createDirectorDeskRecord(records);
     const nextRecords = [...records, record];
     onRecordsChange(nextRecords);
+    broadcastDirectorDeskRegistry();
     openDesk(record.id);
   }
 
@@ -124,6 +127,7 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
         return;
       }
       onRecordsChange(nextRecords);
+      broadcastDirectorDeskRegistry();
       openDesk(record.id);
     });
   }
@@ -138,8 +142,6 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
   }
 
   function handleDeleteDesk(desk: DirectorDeskRecord) {
-    if (!window.confirm(`删除「${desk.name}」？这个工程的本地场景数据也会一起删除。`)) return;
-
     const result = deleteDirectorDeskRecord(records, desk.id);
     onRecordsChange(result.records);
     if (result.records.length === 0) {
@@ -147,9 +149,11 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
       const record = createDirectorDeskRecord([]);
       result.records.push(record);
       onRecordsChange(result.records);
+      broadcastDirectorDeskRegistry();
       openDesk(record.id);
       return;
     }
+    broadcastDirectorDeskRegistry();
     if (desk.id === activeDeskId && result.activeId) openDesk(result.activeId);
   }
 
@@ -201,15 +205,23 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
                 >
                   <Download aria-hidden="true" size={14} strokeWidth={1.9} />
                 </button>
-                <button
-                  className="dproj-row-button is-danger"
-                  type="button"
-                  aria-label={`删除${desk.name}`}
-                  title="删除这个工程"
-                  onClick={() => handleDeleteDesk(desk)}
+                <Popconfirm
+                  title={`删除「${desk.name}」？`}
+                  okText="删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  classNames={{ root: "dproj-popconfirm" }}
+                  onConfirm={() => handleDeleteDesk(desk)}
                 >
-                  <Trash2 aria-hidden="true" size={14} strokeWidth={1.9} />
-                </button>
+                  <button
+                    className="dproj-row-button is-danger"
+                    type="button"
+                    aria-label={`删除${desk.name}`}
+                    title="删除这个工程"
+                  >
+                    <Trash2 aria-hidden="true" size={14} strokeWidth={1.9} />
+                  </button>
+                </Popconfirm>
               </div>
             </article>
           ))}

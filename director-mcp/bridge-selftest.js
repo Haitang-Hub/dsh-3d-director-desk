@@ -1,9 +1,10 @@
 // 桥回路自测：模拟 executor 注册、ready、收 tool_call、回传结果。
 import { spawn } from "node:child_process";
 
-// 自测端口可用 STORE_PORT 覆盖（默认 17383），避免与常驻桥冲突
-const BASE = `http://127.0.0.1:${Number(process.env.STORE_PORT || 17383)}`;
-const server = spawn("node", ["index.js"], { cwd: process.cwd(), stdio: "ignore" });
+// 自测会自己 spawn 一个桥实例，默认 17392（独立于常驻桥的 17372，避免端口冲突）；可用 STORE_PORT 覆盖
+const SELFTEST_PORT = Number(process.env.STORE_PORT || 17392);
+const BASE = `http://127.0.0.1:${SELFTEST_PORT}`;
+const server = spawn("node", ["index.js"], { cwd: process.cwd(), stdio: "ignore", env: { ...process.env, STORE_PORT: String(SELFTEST_PORT) } });
 await new Promise((resolve) => setTimeout(resolve, 1500));
 
 // 桥启用 token 鉴权：先经 /bootstrap 领取 token（回环请求会下发），后续请求全部带上
