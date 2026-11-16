@@ -51,7 +51,7 @@ jobs:
       - name: Install web dependencies
         if: steps.gate.outputs.needed == 'true'
         working-directory: web
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Build web
         if: steps.gate.outputs.needed == 'true'

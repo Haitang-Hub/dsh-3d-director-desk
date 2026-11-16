@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.20.8 - 2026-11-17
+
 + [修复] MCP 门面工具调用必 401（P0）：MCP 门面（stdio 与 harness 注册的 /mcp HTTP 门面共用）的 tools/call 转发到常驻桥 /director/tool 时不带连接 token，而该端点一律要求鉴权——所有 mcp__director-desk__* 工具调用都返回 invalid token。修复：stdio 门面启动后经 /bootstrap 自动领取 token（请求头注入，401 时清缓存重领）；/mcp HTTP 门面改为进程内直调桥实例（不再回环 HTTP 自调用，天然免 token）。bridge-selftest 扩展 tools/list、进程内 tools/call 回路与跨站拒绝三项检查，stdio 门面一次性脚本实测通过。
 + [安全] /mcp 门面拒绝跨站 Origin：CORS 为 * 且 /mcp 免 token，公网网页可向回环端口 POST 并读取响应；现在带非回环 Origin 的 /mcp 请求一律 403（harness/脚本无 Origin 不受影响）。另：/skills/:key 修复路径穿越（resolve + startsWith 校验，与站点文件同口径）；桥启动时的连接 token 明文日志改为仅交互终端打印（插件托管时 stdout 会 pipe 进宿主日志，密钥不落日志）；doctor 的 /director/status 探测补带 token（此前必 401、executor 检测永远误报离线）。
 + [性能] 导演台编辑器持久化防抖：commitMutation 每次变更（拖拽/滑杆每帧）都对全量工程 JSON.stringify + 同步写 localStorage，大场景必然掉帧——改为 250ms 尾随防抖（storage key 调度时捕获，切换作用域前 flush，pagehide/页面隐藏兜底 flush），persist 分支复用既有快照省一次全量提取。
