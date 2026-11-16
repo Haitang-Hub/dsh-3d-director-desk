@@ -1,7 +1,7 @@
 {
   "name": "@haitang-hub/dsh-3d-director-desk",
-  "version": "0.3.20",
-  "description": "3D 导演台右侧栏插件：画布与对话并排，Agent 经 director-desk 工具实时编排场景。",
+  "version": "0.3.21",
+  "description": "3D导演台：基于 three.js 的 3D 场景导演台，摆放角色、运镜、时间轴预演与镜头导出，AI Agent 经本地零依赖 MCP 桥实时编排场景，支持从无限画布跨项目导入",
   "icon": "./icon.png",
   "type": "module",
   "main": "./dsh/index.js",
@@ -19,6 +19,7 @@
     "site",
     "icon.png",
     "cordis.patch.yml",
+    "locale",
     "README.md"
   ],
   "scripts": {
