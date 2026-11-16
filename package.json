@@ -1,6 +1,6 @@
 {
   "name": "@haitang-hub/dsh-3d-director-desk",
-  "version": "0.3.21",
+  "version": "0.3.22",
   "description": "3D导演台：基于 three.js 的 3D 场景导演台，摆放角色、运镜、时间轴预演与镜头导出，AI Agent 经本地零依赖 MCP 桥实时编排场景，支持从无限画布跨项目导入",
   "icon": "./icon.png",
   "type": "module",
@@ -54,14 +54,15 @@
       ]
     }
   },
-  "dependencies": {
-    "@deepseek-ai/schemastery": "3.18.5"
-  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-connection": "^0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-sidebar-right": "^0.2.0-rc.1",
-    "@deepseek-ai/dsh-mcp-client": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": ">=0.2.0-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-mcp-client": ">=0.2.0-rc.1 <0.3.0",
+    "@deepseek-ai/schemastery": "^3.18.5",
     "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/schemastery": "3.18.5"
   }
 }
