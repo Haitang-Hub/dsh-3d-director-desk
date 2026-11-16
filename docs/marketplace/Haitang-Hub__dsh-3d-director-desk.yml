@@ -1,0 +1,8 @@
+# awesome-dsh-plugin 收录条目（提交 PR 时把本文件内容原样复制到其
+# data/plugins/Haitang-Hub__dsh-3d-director-desk.yml）
+url: https://github.com/Haitang-Hub/dsh-3d-director-desk
+name: Haitang-Hub/dsh-3d-director-desk
+category: tools
+description:
+  en: "3D导演台 | A 3D scene directing studio built on three.js — place characters, drive cameras, rehearse timelines and export shots. An AI agent stages the scene through a zero-dependency local MCP bridge, and imports projects from the infinite canvas."
+  zh: "3D导演台 | 基于 three.js 的 3D 场景导演台：摆放角色、运镜、时间轴预演与镜头导出，AI Agent 通过本地零依赖 MCP 桥实时编排场景，支持从无限画布跨项目导入。"

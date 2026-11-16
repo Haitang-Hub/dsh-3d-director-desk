@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "3D Director Desk",
+    "description": "A 3D scene directing studio built on three.js: place characters, drive cameras, rehearse timelines and export shots. An AI agent stages the scene through a zero-dependency local MCP bridge; imports projects from the infinite canvas."
+  }
+}

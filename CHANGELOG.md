@@ -2,6 +2,7 @@
 
 ## Unreleased
 
++ [变更] 补齐 DSH 展示元数据：新增 locale/zh-CN.json 与 locale/en-US.json（meta.title「3D导演台 / 3D Director Desk」+ meta.description），package.json 的 description 与 docs/marketplace 收录条目同步改写（项目名前置），files 白名单加入 locale——DSH 插件市场与已安装插件的标题/描述不再显示包名与旧文案。
 + [变更] 与 Canvas Director 仓库彻底解耦（此前仅剩 URL 级引用）：①版本检查 VERSION/CHANGELOG 改拉本仓库 full 分支（dsh 仓库 main 是发布产物分支、无根 VERSION）；②UI GitHub 链接改指本仓库；③删除 fork 残留的 PLUGIN_REGISTRY_URL 死代码（插件市场概念只属于无限画布，本仓库无消费者）。
 + [变更] 插件设置页「连接 Token」输入框改为密码态（type=password，默认圆点显示，与 API Key 一致）。
 
