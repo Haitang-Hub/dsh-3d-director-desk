@@ -62,6 +62,24 @@ const wrongDesk = await (await fetch(`${BASE}/director/tool?token=${encodeURICom
 console.log("wrong desk:", JSON.stringify(wrongDesk));
 if (wrongDesk.code !== "executor_offline") { console.log("DESK-ROUTING-FAIL"); process.exitCode = 1; }
 
+// MCP HTTP 门面：tools/list 应返回工具面；tools/call 走进程内直调（免 token，仍须 executor 回路成功）
+const mcpList = await (await fetch(`${BASE}/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) })).json();
+const toolCount = Array.isArray(mcpList?.result?.tools) ? mcpList.result.tools.length : 0;
+console.log("mcp tools/list:", toolCount, "tools");
+if (toolCount === 0) { console.log("MCP-LIST-FAIL"); process.exitCode = 1; }
+
+const mcpCall = await (await fetch(`${BASE}/mcp`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "stage_get_state", arguments: { probe: 2 } } }) })).json();
+const mcpCallText = mcpCall?.result?.content?.[0]?.text || "";
+let mcpCallParsed = null;
+try { mcpCallParsed = JSON.parse(mcpCallText); } catch { /* 非 JSON 即失败 */ }
+console.log("mcp tools/call:", JSON.stringify(mcpCallParsed));
+if (mcpCall?.result?.isError || mcpCallParsed?.echoed?.probe !== 2 || mcpCallParsed?.desk !== "deskA") { console.log("MCP-CALL-FAIL"); process.exitCode = 1; }
+
+// 跨站 Origin 的 /mcp 请求必须被拒（CORS * 下公网网页可读回环响应，门面免 token 靠这条兜底）
+const mcpForbidden = await fetch(`${BASE}/mcp`, { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} }) });
+console.log("mcp cross-origin status:", mcpForbidden.status);
+if (mcpForbidden.status !== 403) { console.log("MCP-ORIGIN-GUARD-FAIL"); process.exitCode = 1; }
+
 reader.cancel().catch(() => {});
 server.kill();
 process.exit(process.exitCode || 0);

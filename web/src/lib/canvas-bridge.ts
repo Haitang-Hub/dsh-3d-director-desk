@@ -3,8 +3,8 @@
  * 数据通道是 infinite-canvas canvas-agent(17371) 的本地文件存储端点（免 token）：
  *   - 画布工程：GET/PUT /store/kv/infinite-canvas:canvas_store（zustand persist JSON）
  *   - 媒体文件：POST /store/media/:key，读取走 /media/:key
- * 注意：若 infinite-canvas 页面正开着，其内存态会在下一次变更时覆盖磁盘；
- * 导入后提示用户刷新画布页面。
+ * 注意：infinite-canvas 页面落盘前会按工程 updatedAt 取新者合并（写合并钩子），
+ * 本服务的直写不会被打开中的画布页覆盖；正被导入的工程若正开着，画布页会提示用户刷新查看。
  */
 
 const DEFAULT_BASE = "http://127.0.0.1:17371";

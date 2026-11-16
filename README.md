@@ -23,8 +23,7 @@
 ## 启动
 
 双击 `start.bat`（或 `powershell -ExecutionPolicy Bypass -File start.ps1`）。
-首次运行会自动 `npm install`（使用 `--legacy-peer-deps`，因 antd 6 与
-pro-components beta 的 peer 依赖声明冲突），然后启动 dev server。
+首次运行会自动 `npm install`，然后启动 dev server。
 
 打开 http://localhost:5080 ，点击「新建导演台」进入编辑器。
 

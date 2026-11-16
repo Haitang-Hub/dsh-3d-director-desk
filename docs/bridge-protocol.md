@@ -1,9 +1,10 @@
 # 导演台桥协议（Bridge Protocol v7）
 
-3D 导演台（本仓库）与 infinite-canvas（canvas-agent）共享同一套桥协议设计，两边各自
-维护一份实现（刻意不共享代码，保证项目独立）。**格式变更时两边同步递增版本号。**
+3D 导演台（本仓库）与 infinite-canvas（canvas-agent）源自同一套桥协议设计，两边各自
+维护一份实现（刻意不共享代码，保证项目独立）。拆分后两边协议独立演进，
+**版本号各自递增，不要求一致**（infinite-canvas 的 Agent 对话协议见其仓库 bridge-protocol.md）。
 
-- `protocolVersion`（当前 **8**）：hello 事件携带，executor 不一致时主动断开。
+- `protocolVersion`（当前 **7**）：hello 事件携带，executor 不一致时主动断开。
 - `dv`（当前 **6**）：executor 桥实现版本，服务端多页面同时在线时优先路由到最新版本。
 
 ## 角色

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
++ [修复] MCP 门面工具调用必 401（P0）：MCP 门面（stdio 与 harness 注册的 /mcp HTTP 门面共用）的 tools/call 转发到常驻桥 /director/tool 时不带连接 token，而该端点一律要求鉴权——所有 mcp__director-desk__* 工具调用都返回 invalid token。修复：stdio 门面启动后经 /bootstrap 自动领取 token（请求头注入，401 时清缓存重领）；/mcp HTTP 门面改为进程内直调桥实例（不再回环 HTTP 自调用，天然免 token）。bridge-selftest 扩展 tools/list、进程内 tools/call 回路与跨站拒绝三项检查，stdio 门面一次性脚本实测通过。
++ [安全] /mcp 门面拒绝跨站 Origin：CORS 为 * 且 /mcp 免 token，公网网页可向回环端口 POST 并读取响应；现在带非回环 Origin 的 /mcp 请求一律 403（harness/脚本无 Origin 不受影响）。另：/skills/:key 修复路径穿越（resolve + startsWith 校验，与站点文件同口径）；桥启动时的连接 token 明文日志改为仅交互终端打印（插件托管时 stdout 会 pipe 进宿主日志，密钥不落日志）；doctor 的 /director/status 探测补带 token（此前必 401、executor 检测永远误报离线）。
++ [性能] 导演台编辑器持久化防抖：commitMutation 每次变更（拖拽/滑杆每帧）都对全量工程 JSON.stringify + 同步写 localStorage，大场景必然掉帧——改为 250ms 尾随防抖（storage key 调度时捕获，切换作用域前 flush，pagehide/页面隐藏兜底 flush），persist 分支复用既有快照省一次全量提取。
++ [变更] web 死代码大清理（拆分遗留，56 个文件删除，tsc 由存量错误变零错误）：无入口可达的 components/agent 全树（画布 Agent 面板）、pages/prompts、layouts/user-layout、layout 里 channel/model/prompt-source/user-status/version-release 等组件、use-agent*/workbench/prompt-source/asset 等 store、agent-site-tools/agent-url-bootstrap/director-desk-host、webdav-sync/app-sync/canvas-agent api 等；连带移除 ProConfigProvider/QueryClientProvider 无消费者挂载、streamdown 样式与 prompt-source 后台轮询调度器。
++ [变更] 依赖收敛：删除 pro-components(beta)/react-query/streamdown/antd-icons/codemirror 两件套/axios/copy-to-clipboard/file-saver/radix-ui/@types/file-saver——pro-components beta 是 peer 冲突根源，npm install 不再需要 --legacy-peer-deps（CI 同步改 npm ci，lockfile 重新生成；安装面减少 820 包）。新增 CI 任务：bridge-selftest（桥为零依赖 node 服务，无需安装直接跑回路自测）。
++ [变更] package.json 契约修复：@deepseek-ai/schemastery 从 dependencies 移入 peerDependencies；dsh-* peer 范围 ^0.2.0-rc.1 → `>=0.2.0-rc.1 <0.3.0`（semver 预发布规则下旧范围不含宿主 0.2.2-rc.3）。
 + [变更] 补齐 DSH 展示元数据：新增 locale/zh-CN.json 与 locale/en-US.json（meta.title「3D导演台 / 3D Director Desk」+ meta.description），package.json 的 description 与 docs/marketplace 收录条目同步改写（项目名前置），files 白名单加入 locale——DSH 插件市场与已安装插件的标题/描述不再显示包名与旧文案。
 + [变更] 与 Canvas Director 仓库彻底解耦（此前仅剩 URL 级引用）：①版本检查 VERSION/CHANGELOG 改拉本仓库 full 分支（dsh 仓库 main 是发布产物分支、无根 VERSION）；②UI GitHub 链接改指本仓库；③删除 fork 残留的 PLUGIN_REGISTRY_URL 死代码（插件市场概念只属于无限画布，本仓库无消费者）。
 + [变更] 插件设置页「连接 Token」输入框改为密码态（type=password，默认圆点显示，与 API Key 一致）。

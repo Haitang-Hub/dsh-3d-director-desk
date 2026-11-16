@@ -23,11 +23,11 @@ netstat -ano | findstr /r ":5080 .*LISTENING" >nul 2>nul && (
     echo [WARN] port 5080 is already in use, existing instance may be running
 )
 
-:: web needs --legacy-peer-deps: antd 6 conflicts with pro-components beta peer range
+:: web install（pro-components beta 已移除，peer 冲突不再存在，无需 --legacy-peer-deps）
 if not exist "%WEB_DIR%\node_modules" (
     echo [..] Installing web dependencies, first run only
     pushd "%WEB_DIR%"
-    call npm install --legacy-peer-deps
+    call npm install
     if errorlevel 1 (
         popd
         echo [ERR] web npm install failed

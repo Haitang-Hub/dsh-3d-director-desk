@@ -14,6 +14,23 @@ const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const BRIDGE_URL = (process.env.DIRECTOR_BRIDGE_URL || "http://127.0.0.1:17372").replace(/\/$/, "");
 const DESK = process.env.DIRECTOR_DESK || "";
 
+// /director/tool 要求连接 token：DIRECTOR_BRIDGE_TOKEN 固定值优先，否则经 /bootstrap 领取
+// （本进程 fetch 不带 Origin，桥会把 token 下发给无 Origin 的本机调用方）。缓存后随调用复用。
+let cachedBridgeToken = "";
+async function resolveBridgeToken() {
+    const fixed = process.env.DIRECTOR_BRIDGE_TOKEN?.trim();
+    if (fixed) return fixed;
+    if (cachedBridgeToken) return cachedBridgeToken;
+    try {
+        const res = await fetch(`${BRIDGE_URL}/bootstrap`, { signal: AbortSignal.timeout(2000) });
+        const body = await res.json().catch(() => null);
+        cachedBridgeToken = String(body?.token || "").trim();
+    } catch {
+        // 桥不在线时拿不到 token，callBridge 会走 bridge_offline 分支。
+    }
+    return cachedBridgeToken;
+}
+
 /** 启动 stdio MCP 服务。 */
 export async function startMcpServer() {
     let buffer = "";
@@ -77,7 +94,8 @@ async function respondTo(message) {
     }
 }
 
-export async function handleMethod(method, params) {
+/** context.callTool：宿主进程内已有的桥实例可直接注入（HTTP 门面），免去回环 HTTP 自调用。 */
+export async function handleMethod(method, params, context = {}) {
     switch (method) {
         case "initialize":
             return {
@@ -95,8 +113,14 @@ export async function handleMethod(method, params) {
         case "tools/call": {
             const name = String(params.name || "");
             const input = params.arguments && typeof params.arguments === "object" ? params.arguments : {};
-            const result = await callBridge(name, input);
-            // callBridge 的错误结果已是 MCP 形态（content + isError），直接透传
+            let result;
+            try {
+                result = context.callTool ? await context.callTool(name, input) : await callBridge(name, input);
+            } catch (error) {
+                const payload = error && typeof error === "object" ? error : {};
+                result = errorResult({ error: payload.message || String(error), ...(payload.code ? { code: payload.code } : {}), ...(payload.hint ? { hint: payload.hint } : {}) });
+            }
+            // 错误结果已是 MCP 形态（content + isError），直接透传
             if (result && typeof result === "object" && Array.isArray(result.content)) return result;
             return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         }
@@ -107,11 +131,12 @@ export async function handleMethod(method, params) {
 
 /** 把工具调用转发到常驻桥；bridge 侧结构化错误转为 MCP isError 结果。 */
 async function callBridge(name, input) {
+    const token = await resolveBridgeToken();
     let res;
     try {
         res = await fetch(`${BRIDGE_URL}/director/tool`, {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: { "content-type": "application/json", ...(token ? { "x-director-token": token } : {}) },
             body: JSON.stringify({ name, input, desk: DESK }),
         });
     } catch {
@@ -119,6 +144,11 @@ async function callBridge(name, input) {
             error: "bridge_offline",
             hint: `director-mcp 常驻服务未运行（${BRIDGE_URL}）。先运行 start.bat 或在 director-mcp 目录执行 node index.js`,
         });
+    }
+    if (res.status === 401) {
+        // token 失效（桥换了数据目录/重启生成新 token）：清缓存，下次调用重新领取
+        cachedBridgeToken = "";
+        return errorResult({ error: "invalid token", hint: "桥的连接 token 已变化，重试一次即可自动重新领取" });
     }
     const body = await res.json().catch(() => ({}));
     if (!body.ok) return errorResult({ error: body.error || "tool call failed", ...(body.code ? { code: body.code } : {}), ...(body.hint ? { hint: body.hint } : {}) });

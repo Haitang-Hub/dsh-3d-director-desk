@@ -365,15 +365,46 @@ function extractPersistedDirectorState(state: DirectorRuntimeState): DirectorSta
   });
 }
 
-function writePersistedDirectorState(state: DirectorState) {
-  const storage = getLocalStorageSafe();
-  if (!storage) return;
+/**
+ * 持久化写盘：高频变更（拖拽/滑杆每帧 commitMutation）若每次都全量 stringify + 同步
+ * setItem 会卡主线程。改为尾随防抖（250ms 内合并为最后一次），storage key 在调度时捕获，
+ * 避免切换作用域后旧挂起写落错键；pagehide/隐藏时 flush 兜底，关闭页面不丢数据。
+ */
+const DIRECTOR_PERSIST_DEBOUNCE_MS = 250;
+let pendingPersist: { storage: Storage; key: string; state: DirectorState } | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
+function flushPersistedDirectorState() {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  const pending = pendingPersist;
+  pendingPersist = null;
+  if (!pending) return;
   try {
-    storage.setItem(getDirectorSceneStorageKey(), JSON.stringify(state));
+    pending.storage.setItem(pending.key, JSON.stringify(pending.state));
   } catch {
     // Keep the editor usable if the browser storage quota is exceeded.
   }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flushPersistedDirectorState);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPersistedDirectorState();
+  });
+}
+
+function writePersistedDirectorState(state: DirectorState) {
+  const storage = getLocalStorageSafe();
+  if (!storage) return;
+  pendingPersist = { storage, key: getDirectorSceneStorageKey(), state };
+  if (persistTimer !== null) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    flushPersistedDirectorState();
+  }, DIRECTOR_PERSIST_DEBOUNCE_MS);
 }
 
 function createStateFromPersistedProject(project: DirectorProject, options: DirectorStateOptions = {}): DirectorState {
@@ -1117,7 +1148,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
       };
 
       if (persist) {
-        writePersistedDirectorState(extractPersistedDirectorState(runtimeState));
+        // nextSnapshot 已是 next 的持久化投影（不含 undo 字段），直接复用，省一次全量提取
+        writePersistedDirectorState(nextSnapshot);
       }
 
       return runtimeState;
@@ -3128,6 +3160,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
     },
     openScopedScene: (scopeId) => {
       const currentState = get() as DirectorRuntimeState;
+      // 切作用域前先把旧作用域的挂起防抖写落盘（key 已在调度时捕获，落旧键）
+      flushPersistedDirectorState();
       setDirectorScenePersistenceScopeId(scopeId);
       const snapshot = createInitialDirectorState({
         includePersistedLocalAssets: true,
@@ -3161,6 +3195,8 @@ export const useDirectorStore = create<DirectorStore>((set, get) => {
       writePersistedDirectorState(extractPersistedDirectorState(get() as DirectorRuntimeState));
     },
     restoreLatestSnapshot: () => {
+      // 读取前先落盘挂起写，避免读到尚未写入的旧快照
+      flushPersistedDirectorState();
       const snapshot = readPersistedDirectorState({ includePersistedLocalAssets: true, includePersistedScene: true });
       if (!snapshot) return;
 

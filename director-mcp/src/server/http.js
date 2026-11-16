@@ -39,6 +39,8 @@ import { DIRECTOR_PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION } from "../proto
 
 const PORT = Number(process.env.STORE_PORT || 17372);
 const HOST = process.env.STORE_HOST || "127.0.0.1";
+// MCP 门面进程内直调桥时透传的 desk 标识（与 mcp.js 的 DESK 同源）
+const DESK = process.env.DIRECTOR_DESK || "";
 const DATA_DIR = resolve(process.env.DIRECTOR_STORE_DIR?.trim() || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "data"));
 
 // 站点伺服（阶段二）：让桥直接承载导演台 Web 构建产物，Desktop 工作台面板的 iframe
@@ -283,17 +285,24 @@ const server = http.createServer(async (req, res) => {
 
         if (group === "events" && req.method === "GET") return bridge.openEvents(url, res);
 
-        // MCP over HTTP（streamable HTTP 的无状态子集）：外部 harness 无法拉起 stdio 进程时用这个门面
+        // MCP over HTTP（streamable HTTP 的无状态子集）：外部 harness 无法拉起 stdio 进程时用这个门面。
+        // 无 Origin 的调用方（harness/脚本）放行；带跨站 Origin 的浏览器请求拒绝——
+        // CORS * 会让公网网页能读回环响应，/mcp 又免 token，必须挡掉这一条后门。
         if (group === "mcp") {
             if (req.method !== "POST") {
                 res.setHeader("allow", "POST");
                 return sendJson(res, 405, { ok: false, error: "POST JSON-RPC 2.0 messages to /mcp" });
             }
+            const origin = req.headers.origin || "";
+            if (origin && !LOOPBACK_ORIGIN.test(origin)) return sendJson(res, 403, { ok: false, error: "cross-origin /mcp denied" });
             const message = JSON.parse((await readBody(req)).toString("utf8") || "{}");
             if (!message || typeof message !== "object") return sendJson(res, 400, { ok: false, error: "bad json-rpc message" });
             if (message.id === undefined || message.id === null) return send(res, 202, "");
             try {
-                const result = await handleMcpMethod(String(message.method || ""), message.params || {});
+                // 进程内直调桥（tools/call 不再经 callBridge 回环 HTTP 自调用，绕开 /director/tool 的 token 校验）
+                const result = await handleMcpMethod(String(message.method || ""), message.params || {}, {
+                    callTool: (name, input) => bridge.callTool(name, input, DESK),
+                });
                 return sendJson(res, 200, { jsonrpc: "2.0", id: message.id, result });
             } catch (error) {
                 const payload = error && typeof error === "object" ? error : {};
@@ -313,8 +322,9 @@ const server = http.createServer(async (req, res) => {
                 return sendJson(res, 200, { ok: true, skills: names });
             }
             if (key && req.method === "GET") {
-                const file = join(skillsDir, key, "SKILL.md");
-                if (!fs.existsSync(file)) return sendJson(res, 404, { ok: false, error: "skill not found" });
+                // key 是单段目录名：越界（..%2F 等归一化逃逸）直接拒绝，与站点文件的 startsWith 校验同口径
+                const file = resolve(skillsDir, key, "SKILL.md");
+                if (!file.startsWith(resolve(skillsDir) + sep) || !fs.existsSync(file)) return sendJson(res, 404, { ok: false, error: "skill not found" });
                 return send(res, 200, fs.readFileSync(file), { "content-type": "text/markdown; charset=utf-8" });
             }
         }
@@ -426,7 +436,10 @@ export function startHttpServer() {
         console.log(`[director-mcp] listening on http://${HOST}:${PORT}, data dir: ${DATA_DIR}`);
         console.log(`[director-mcp] bridge protocol v${DIRECTOR_PROTOCOL_VERSION}; MCP stdio: node index.js mcp; self-check: node index.js doctor`);
         // 手动连接时用户要从运行窗口抄 token；回环网页仍走 /bootstrap 零配置自动领取。
-        console.log(`[director-mcp] connect token: ${TOKEN} (pin via DIRECTOR_BRIDGE_TOKEN; web pages get it from /bootstrap automatically)`);
+        // 仅交互终端打印：插件托管时 stdout 会 pipe 进宿主日志，密钥不落日志。
+        if (process.stdout.isTTY) {
+            console.log(`[director-mcp] connect token: ${TOKEN} (pin via DIRECTOR_BRIDGE_TOKEN; web pages get it from /bootstrap automatically)`);
+        }
     });
     return server;
 }

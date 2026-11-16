@@ -26,11 +26,11 @@ if (Get-NetTCPConnection -LocalPort 5080 -State Listen -ErrorAction SilentlyCont
     Write-Host "[WARN] port 5080 is already in use, existing instance may be running" -ForegroundColor Yellow
 }
 
-# web needs --legacy-peer-deps: antd 6 conflicts with pro-components beta peer range
+# web install（pro-components beta 已移除，peer 冲突不再存在，无需 --legacy-peer-deps）
 if (-not (Test-Path "$webDir/node_modules")) {
     Write-Host "[..] Installing web dependencies, first run only..." -ForegroundColor Cyan
     Push-Location $webDir
-    npm install --legacy-peer-deps
+    npm install
     $failed = ($LASTEXITCODE -ne 0)
     Pop-Location
     if ($failed) { Write-Host "[ERR] web npm install failed" -ForegroundColor Red; exit 1 }

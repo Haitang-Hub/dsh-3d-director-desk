@@ -61,7 +61,14 @@ async function runDoctor() {
     else fail(`桥不在线：${BRIDGE_URL} —— 在 director-mcp 目录运行 node index.js（或用 start.bat 启动）`);
 
     if (health?.body?.ok) {
-        const status = await getJson(`${BRIDGE_URL}/director/status`);
+        // /director/status 在 token 鉴权范围内：env 固定值或桥落盘的 data/bridge-token.txt，与桥同源解析
+        let token = process.env.DIRECTOR_BRIDGE_TOKEN?.trim() || "";
+        if (!token) {
+            try {
+                token = fs.readFileSync(join(DATA_DIR, "bridge-token.txt"), "utf8").trim();
+            } catch { /* 桥还没写过 token 文件 */ }
+        }
+        const status = await getJson(`${BRIDGE_URL}/director/status${token ? `?token=${encodeURIComponent(token)}` : ""}`);
         const ready = (status?.body?.executors || []).filter((item) => item.ready);
         if (ready.length) pass(`executor 在线 ${ready.length} 个：${ready.map((item) => item.deskId || "(未指定 desk)").join(", ")}`);
         else fail("没有已就绪的导演台页面 —— 打开 http://127.0.0.1:17372 并进入一个导演台编辑器后重试");

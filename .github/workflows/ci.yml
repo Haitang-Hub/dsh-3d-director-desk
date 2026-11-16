@@ -19,10 +19,10 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      # antd 6 conflicts with pro-components beta peer range
+      # pro-components beta（peer 冲突根源）已随死代码清理移除，npm ci 可干净解析
       - name: Install web dependencies
         working-directory: web
-        run: npm install --legacy-peer-deps
+        run: npm ci
 
       - name: Typecheck
         working-directory: web
@@ -45,3 +45,19 @@ jobs:
           path: web/dist
           retention-days: 7
           if-no-files-found: error
+
+  bridge-selftest:
+    name: director-mcp bridge selftest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 桥是零依赖 node 服务：无需安装，直接跑回路自测
+      # （executor 注册 / ready / tool 回路 / desk 路由 / MCP 门面 / 跨站 Origin 拒绝）
+      - name: Run bridge selftest
+        working-directory: director-mcp
+        run: node bridge-selftest.js

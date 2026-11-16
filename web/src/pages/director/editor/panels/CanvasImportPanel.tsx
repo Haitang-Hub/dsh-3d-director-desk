@@ -193,7 +193,7 @@ export function CanvasImportPanel({ importTarget }: { importTarget: DirectorImpo
     const title = await appendNodesToRemoteCanvas(importTarget.projectId, importTarget.nodeId, [placedNode], [
       { id: nanoid(), fromNodeId: importTarget.nodeId, toNodeId: node.id },
     ]);
-    return `已导入画布「${title}」，若画布页面正开着请刷新后查看`;
+    return `已导入画布「${title}」；该画布页面若正开着，请刷新后查看新导入的节点`;
   }
 
   async function uploadScreenshotToCanvas(dataUrl: string, mimeType: string) {

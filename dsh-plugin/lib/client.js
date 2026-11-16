@@ -128,10 +128,13 @@ window.__ModuleLoader__.load({
     function DirectorDeskTab({ useTabInfo }) {
       const info = useBridgeInfo()
       const iframeRef = useRef(null)
-      // 画布插件经 sidebarRight.openTab('director-desk', { params: { instanceId } }) 打开本标签时，
-      // 导航参数带目标实例：iframe 据此加载 /director/editor?instanceId=...（无参保持根路径旧行为）。
+      // 画布插件经 sidebarRight.openTab('director-desk', { params: { instanceId, fromCanvas?, fromNode? } }) 打开本标签时，
+      // 导航参数带目标实例与导入定位：iframe 据此加载 /director/editor?instanceId=...&fromCanvas=...&fromNode=...
+      // （无参保持根路径旧行为）。
       const tabInfo = useTabInfo()
       const instanceId = tabInfo?.tab?.navigation?.params?.instanceId
+      const fromCanvas = tabInfo?.tab?.navigation?.params?.fromCanvas
+      const fromNode = tabInfo?.tab?.navigation?.params?.fromNode
       const [nonce, setNonce] = useState(0)
       // 设置同步令牌：写进 iframe URL，只有携带它的消息才会被接受/回发。
       // 独立打开的页面没有令牌，设置桥保持惰性。
@@ -301,9 +304,16 @@ window.__ModuleLoader__.load({
       }
 
       // 新窗口带 dshWindow=1：页面经同源 BroadcastChannel 跟随本 iframe 的共享设置、Harness 模型与实例。
+      const editorQuery = () => {
+        if (!instanceId) return ''
+        const params = [`instanceId=${encodeURIComponent(instanceId)}`]
+        if (fromCanvas) params.push(`fromCanvas=${encodeURIComponent(fromCanvas)}`)
+        if (fromNode) params.push(`fromNode=${encodeURIComponent(fromNode)}`)
+        return `director/editor?${params.join('&')}`
+      }
       const openExternal = () => {
         if (!info?.port) return
-        const base = `${bridgeOrigin(info)}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`
+        const base = `${bridgeOrigin(info)}/${editorQuery()}`
         const query = `dshWindow=1&dshSettingsProject=${SHARED_PROJECT_ID}`
         window.open(`${base}${base.includes('?') ? '&' : '?'}${query}`, '_blank', 'noopener')
       }
@@ -339,7 +349,7 @@ window.__ModuleLoader__.load({
             key: `${instanceId || 'root'}#${nonce}`,
             ref: iframeRef,
             src: (() => {
-              const base = `${bridgeOrigin(info)}/${instanceId ? `director/editor?instanceId=${encodeURIComponent(instanceId)}` : ''}`
+              const base = `${bridgeOrigin(info)}/${editorQuery()}`
               const query = `dshSettingsToken=${encodeURIComponent(settingsToken)}&dshSettingsProject=${SHARED_PROJECT_ID}`
               return `${base}${base.includes('?') ? '&' : '?'}${query}`
             })(),
@@ -411,6 +421,9 @@ window.__ModuleLoader__.load({
       '.dsh-aigc-cfg__flabel{color:var(--dsw-alias-label-secondary);font-size:12px}',
       '.dsh-aigc-cfg__inp{box-sizing:border-box;width:100%;min-height:28px;padding:4px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}',
       '.dsh-aigc-cfg__inp:focus{border-color:var(--dsw-alias-state-business-primary)}',
+      '.dsh-aigc-cfg__secret{display:flex;gap:6px;min-width:0}',
+      '.dsh-aigc-cfg__secret .dsh-aigc-cfg__inp{flex:1;min-width:0}',
+      '.dsh-aigc-cfg__secret .dsh-aigc-cfg__btn{flex:none}',
       '.dsh-aigc-cfg__toggle{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;min-width:0}',
       '.dsh-aigc-cfg__toggle input{flex:none;width:16px;height:16px;margin:0;accent-color:var(--dsw-alias-state-business-primary);cursor:pointer}',
       '.dsh-aigc-cfg__btn{height:28px;padding:0 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}',
@@ -519,6 +532,28 @@ window.__ModuleLoader__.load({
         spellCheck: false,
         onChange: event => onChange(event.target.value),
       })
+    }
+
+    // 密码态输入 + 显示/隐藏切换：默认打点，按钮切换明文（用于 Connect token 等敏感值）
+    function secretInput({ value, onChange, placeholder }) {
+      const [visible, setVisible] = useState(false)
+      return h('div', { className: 'dsh-aigc-cfg__secret' },
+        h('input', {
+          className: 'dsh-aigc-cfg__inp',
+          type: visible ? 'text' : 'password',
+          value: value ?? '',
+          placeholder: placeholder || '',
+          autoComplete: 'off',
+          spellCheck: false,
+          onChange: event => onChange(event.target.value),
+        }),
+        h('button', {
+          type: 'button',
+          className: 'dsh-aigc-cfg__btn is-sm',
+          title: visible ? '隐藏' : '显示',
+          onClick: () => setVisible(v => !v),
+        }, visible ? '隐藏' : '显示'),
+      )
     }
 
     function selectControl(options, value, onChange) {
@@ -870,7 +905,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'dsh-aigc-cfg__card' },
           cardHead('连接 Token', '网页与脚本访问本地服务用的 Connect token'),
           h('div', { className: 'dsh-aigc-cfg__grid2' },
-            settingsField('Connect token', textInput(project.bridgeToken || '', value => updateProject('bridgeToken', value.trim()), '留空 = 自动（已默认填充当前 token）', 'password')),
+            settingsField('Connect token', h(secretInput, { value: project.bridgeToken || '', onChange: value => updateProject('bridgeToken', value.trim()), placeholder: '留空 = 自动（已默认填充当前 token）' })),
           ),
           h('p', { className: 'dsh-aigc-cfg__note' },
             '服务启动后会把当前 token 默认填充到这里。改成自定义值并「重启服务」后，插件以固定 token 拉起服务；清空再重启则恢复自动 token。网页端始终经 /bootstrap 自动领取，无需手动填写。'),
