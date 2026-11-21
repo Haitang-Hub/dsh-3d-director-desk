@@ -89,15 +89,16 @@
   z-index: 5;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
+  gap: 8px;
   height: 40px;
-  padding: 0;
+  padding: 0 16px 0 13px;
   border: 1px solid rgb(var(--text-muted-rgb) / 0.28);
-  border-radius: 10px;
+  border-radius: 999px;
   color: rgb(var(--text-muted-rgb));
   background: rgb(var(--surface-rgb) / 0.6);
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
   transition:
     color 0.18s ease,
     border-color 0.18s ease,

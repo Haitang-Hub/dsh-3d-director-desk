@@ -147,8 +147,9 @@ export default function DirectorHelpPage() {
     <div className="h-dvh overflow-hidden">
       <div className="director-desk-app h-full" data-theme={theme === "dark" ? "dark" : "light"}>
         <main className="director-home-shell">
-          <button className="director-home-back" type="button" aria-label="返回导演台" onClick={() => navigate("/")}>
-            <ArrowLeft aria-hidden="true" size={18} />
+          <button className="director-home-back" type="button" aria-label="回到导演台" onClick={() => navigate("/")}>
+            <ArrowLeft aria-hidden="true" size={17} />
+            回到导演台
           </button>
           <section className="director-home-hero">
             <div>
