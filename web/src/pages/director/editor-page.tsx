@@ -103,7 +103,7 @@ function DirectorDeskNameField({ desks, activeDeskId, onChange }: { desks: Direc
     );
   }
   return (
-    <span className="director-desk-name" title="双击修改导演台名称" onDoubleClick={() => setEditing(true)}>
+    <span className="director-desk-name" onDoubleClick={() => setEditing(true)}>
       <span className="director-desk-name-text">{active?.name || "未命名导演台"}</span>
     </span>
   );
@@ -245,10 +245,10 @@ export default function DirectorEditorPage() {
         <div className="app-shell">
           <header className="top-bar">
             <div className="top-bar-left">
-              <button className="top-bar-icon-button" type="button" title="工程目录（新建 / 导入 / 删除 / 切换）" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
+              <button className="top-bar-icon-button" type="button" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
                 <FolderOpen aria-hidden="true" size={15} />
               </button>
-              <button className="top-bar-icon-button" type="button" title="帮助文档" aria-label="打开帮助文档" onClick={openHelpDocs}>
+              <button className="top-bar-icon-button" type="button" aria-label="打开帮助文档" onClick={openHelpDocs}>
                 <BookOpen aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField
@@ -301,7 +301,6 @@ export default function DirectorEditorPage() {
                 className="top-bar-motion-button"
                 type="button"
                 aria-label="打开模型配置"
-                title="模型配置"
                 onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
               >
                 <Cpu aria-hidden="true" size={15} />
