@@ -158,7 +158,7 @@ export default function DirectorHelpPage() {
                 <ArrowDownToLine aria-hidden="true" size={14} />
               </a>
             </div>
-            <div>
+            <div className="director-home-hero-copy">
               <p className="director-home-kicker">3D Director Desk · Help</p>
               <h1>3D 导演台帮助文档</h1>
               <p>
