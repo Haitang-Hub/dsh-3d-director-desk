@@ -91,9 +91,9 @@
   align-items: center;
   gap: 8px;
   height: 40px;
-  padding: 0 16px 0 13px;
+  padding: 0 14px;
   border: 1px solid rgb(var(--text-muted-rgb) / 0.28);
-  border-radius: 999px;
+  border-radius: 10px;
   color: rgb(var(--text-muted-rgb));
   background: rgb(var(--surface-rgb) / 0.6);
   cursor: pointer;
