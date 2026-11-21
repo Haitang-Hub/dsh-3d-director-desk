@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDownToLine, ArrowRight, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload } from "lucide-react";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
@@ -148,6 +148,16 @@ export default function DirectorHelpPage() {
       <div className="director-desk-app h-full" data-theme={theme === "dark" ? "dark" : "light"}>
         <main className="director-home-shell">
           <section className="director-home-hero">
+            <div className="director-home-hero-actions">
+              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
+                <ArrowLeft aria-hidden="true" size={18} />
+                回到导演台
+              </button>
+              <a className="director-home-scroll-hint" href="#director-home-guide-title">
+                向下查看使用说明
+                <ArrowDownToLine aria-hidden="true" size={14} />
+              </a>
+            </div>
             <div>
               <p className="director-home-kicker">3D Director Desk · Help</p>
               <h1>3D 导演台帮助文档</h1>
@@ -173,16 +183,6 @@ export default function DirectorHelpPage() {
                 <Sparkles aria-hidden="true" size={13} />
                 {bridgeOnline === null ? "AI 桥检测中…" : bridgeOnline ? "AI 桥在线" : "AI 桥离线"}
               </span>
-            </div>
-            <div className="director-home-hero-actions">
-              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
-                <ArrowRight aria-hidden="true" size={18} />
-                回到导演台
-              </button>
-              <a className="director-home-scroll-hint" href="#director-home-guide-title">
-                向下查看使用说明
-                <ArrowDownToLine aria-hidden="true" size={14} />
-              </a>
             </div>
           </section>
 
