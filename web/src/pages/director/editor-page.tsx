@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpen, FolderOpen, Route, Settings2 } from "lucide-react";
+import { BookOpen, Cpu, FolderOpen, Route } from "lucide-react";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { useConfigStore } from "@/stores/use-config-store";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
@@ -304,7 +304,7 @@ export default function DirectorEditorPage() {
                 title="模型配置"
                 onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
               >
-                <Settings2 aria-hidden="true" size={15} />
+                <Cpu aria-hidden="true" size={15} />
               </button>
             </div>
           </header>
