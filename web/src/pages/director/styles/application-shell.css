@@ -51,11 +51,6 @@
   margin: 0 auto 34px;
 }
 
-/* hero 左右互换后文案块居右：kicker/标题/描述与 AI 桥徽标随内容右对齐 */
-.director-home-hero-copy {
-  text-align: right;
-}
-
 .director-home-kicker {
   margin: 0 0 14px;
   color: rgb(var(--accent-rgb));

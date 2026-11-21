@@ -148,17 +148,7 @@ export default function DirectorHelpPage() {
       <div className="director-desk-app h-full" data-theme={theme === "dark" ? "dark" : "light"}>
         <main className="director-home-shell">
           <section className="director-home-hero">
-            <div className="director-home-hero-actions">
-              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
-                <ArrowLeft aria-hidden="true" size={18} />
-                回到导演台
-              </button>
-              <a className="director-home-scroll-hint" href="#director-home-guide-title">
-                向下查看使用说明
-                <ArrowDownToLine aria-hidden="true" size={14} />
-              </a>
-            </div>
-            <div className="director-home-hero-copy">
+            <div>
               <p className="director-home-kicker">3D Director Desk · Help</p>
               <h1>3D 导演台帮助文档</h1>
               <p>
@@ -183,6 +173,16 @@ export default function DirectorHelpPage() {
                 <Sparkles aria-hidden="true" size={13} />
                 {bridgeOnline === null ? "AI 桥检测中…" : bridgeOnline ? "AI 桥在线" : "AI 桥离线"}
               </span>
+            </div>
+            <div className="director-home-hero-actions">
+              <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
+                <ArrowLeft aria-hidden="true" size={18} />
+                回到导演台
+              </button>
+              <a className="director-home-scroll-hint" href="#director-home-guide-title">
+                向下查看使用说明
+                <ArrowDownToLine aria-hidden="true" size={14} />
+              </a>
             </div>
           </section>
 
