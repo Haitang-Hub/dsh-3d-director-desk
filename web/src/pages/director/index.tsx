@@ -6,7 +6,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
 const HOME_QUICK_START_STEPS = [
-  ["打开导演台", "点击本页「打开导演台」进入编辑器，自动恢复上次使用的工程。"],
+  ["回到导演台", "点击本页「回到导演台」进入编辑器，自动恢复上次使用的工程。"],
   ["摆人物和道具", "从工具栏添加模型，选中后使用 XYZ 三轴移动、旋转和缩放。"],
   ["记录镜头", "点击“运镜 → 开始掌镜”，用 WASD 移动，每到一个镜头按 Enter。"],
   ["预演并导出", "先“看路线”检查轨迹，再“看成片”，满意后导出 MP4 参考视频。"],
@@ -177,7 +177,7 @@ export default function DirectorHelpPage() {
             <div className="director-home-hero-actions">
               <button className="director-home-primary-button" type="button" onClick={() => navigate("/")}>
                 <ArrowRight aria-hidden="true" size={18} />
-                打开导演台
+                回到导演台
               </button>
               <a className="director-home-scroll-hint" href="#director-home-guide-title">
                 向下查看使用说明
