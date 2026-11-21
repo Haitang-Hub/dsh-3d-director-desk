@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, Eye, EyeOff, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Tooltip } from "antd";
 
 import { buildApiUrl, createModelChannel, decodeChannelModel, modelOptionsFromChannels, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore, type AiConfig, type ChannelModel, type ModelChannel } from "@/stores/use-config-store";
 
@@ -336,16 +337,19 @@ function ChannelCard({ channel, isAgentChannel, canDelete, onEdit, onDelete }: {
                         <button type="button" className="dcfg-secondary-button" onClick={onEdit}>
                             <Pencil aria-hidden="true" size={12} /> 编辑
                         </button>
-                        <button
-                            type="button"
-                            className="dcfg-icon-button is-danger"
-                            aria-label={`删除渠道 ${channel.name || ""}`}
-                            disabled={!canDelete}
-                            title={canDelete ? "删除渠道" : "至少保留一个渠道"}
-                            onClick={() => setConfirming(true)}
-                        >
-                            <Trash2 aria-hidden="true" size={13} />
-                        </button>
+                        <Tooltip title={canDelete ? "删除渠道" : "至少保留一个渠道"}>
+                            <span className="inline-flex">
+                                <button
+                                    type="button"
+                                    className="dcfg-icon-button is-danger"
+                                    aria-label={`删除渠道 ${channel.name || ""}`}
+                                    disabled={!canDelete}
+                                    onClick={() => setConfirming(true)}
+                                >
+                                    <Trash2 aria-hidden="true" size={13} />
+                                </button>
+                            </span>
+                        </Tooltip>
                     </>
                 )}
             </div>

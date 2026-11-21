@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Bot, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Eraser, ImagePlus, Magnet, SlidersHorizontal, X, XCircle } from "lucide-react";
+import { Tooltip } from "antd";
 
 import { encodeChannelModel, useConfigStore, type ModelChannel } from "@/stores/use-config-store";
 
@@ -299,9 +300,11 @@ function AgentModelRow() {
                         </>
                     ) : null}
                     {harnessGroups !== null && !harnessOptions.length && harnessError ? (
-                        <div className="director-agent-model-empty" title={harnessError}>
-                            Harness 模型不可用：{harnessError}
-                        </div>
+                        <Tooltip title={harnessError}>
+                            <div className="director-agent-model-empty">
+                                Harness 模型不可用：{harnessError}
+                            </div>
+                        </Tooltip>
                     ) : null}
                     {channelOptions.length ? (
                         <>
