@@ -29,8 +29,7 @@ executor = 右侧栏「导演台」标签 iframe 里的导演台编辑器（用�
 - 数据落 `$DSH_HOME/3d-director-desk/`（`DIRECTOR_STORE_DIR`），卸载插件不删数据；
 - 面板形态是 **DSH 右侧栏标签**，不是工作台分栏：会话保持整页宽度（宿主自己的布局
   不动），导演台画布停靠在右侧栏的一个标签页里，可拖动、可拆分、可全屏；从右侧栏
-  「开始」引导页点「3D 导演台」打开，之后作为普通标签保留；标签顶部有
-  「新窗口 / 重启服务 / 刷新」快捷操作（重启服务重建本地桥，无需重启应用）；
+  「开始」引导页点「3D 导演台」打开，之后作为普通标签保留；
 - 客户端外壳只用宿主基线 React（18.x）；React 19 + three.js 的应用跑在 iframe 里，
   桥地址经 `/api/director-desk.bridge-info` 动态发现；
 - 端口单一事实来源：环境变量 `DIRECTOR_DESK_PORT`（默认 17372），
@@ -75,9 +74,9 @@ cd dsh-3d-director-desk && npm pack    # 产出 .tgz，再按上行安装
 | 接口 | 用途 |
 | --- | --- |
 | `GET /api/director-desk.bridge-info` | `{ ready, host, port, supervised, restarts, error? }`，标签页据此决定显示 iframe 还是离线引导 |
-| `POST /api/director-desk.restart-bridge` | 强制杀掉插件托管的桥子进程并重建，面板「重启服务」按钮用 |
+| `POST /api/director-desk.restart-bridge` | 强制杀掉插件托管的桥子进程并重建，设置页「重启服务」按钮用 |
 | `sidebarRightTabs.register({ id, kind, title, guide })` | 声明「导演台」标签类型，并在右侧栏「开始」引导页放入口 |
-| `slots.register({ name: 'sidebar.right.pane.tab', key })` | 标签正文：快捷操作行 + 导演台 iframe |
+| `slots.register({ name: 'sidebar.right.pane.tab', key })` | 标签正文：导演台 iframe |
 
 右侧栏形态下会话由宿主直接渲染，插件不自建聊天界面。
 

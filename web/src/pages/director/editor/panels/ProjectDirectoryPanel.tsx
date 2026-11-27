@@ -209,7 +209,7 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
                   title={`删除「${desk.name}」？`}
                   okText="删除"
                   cancelText="取消"
-                  okButtonProps={{ danger: true }}
+                  okButtonProps={{ className: "dproj-confirm-ok" }}
                   classNames={{ root: "dproj-popconfirm" }}
                   onConfirm={() => handleDeleteDesk(desk)}
                 >

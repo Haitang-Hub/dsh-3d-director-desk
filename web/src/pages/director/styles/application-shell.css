@@ -2632,18 +2632,18 @@
   color: rgb(255 255 255 / 0.95) !important;
 }
 
-/* 删除按钮：对齐工程目录里 .dproj-row-button.is-danger 的危险描边风格 */
-.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous {
-  border-color: rgb(226 82 82 / 0.6);
-  background: rgb(226 82 82 / 0.12);
+/* 删除确认按钮：对齐工程目录主题的深蓝色强调色 */
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.dproj-confirm-ok {
+  border-color: rgb(77 143 248 / 0.6);
+  background: rgb(77 143 248 / 0.18);
   box-shadow: none;
-  color: #ff8f8f;
+  color: #a8c9ff;
 }
 
-.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.ant-btn-dangerous:hover {
-  border-color: rgb(226 82 82 / 0.85) !important;
-  background: rgb(226 82 82 / 0.22) !important;
-  color: #ffb3b3 !important;
+.dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.dproj-confirm-ok:hover {
+  border-color: rgb(77 143 248 / 0.85) !important;
+  background: rgb(77 143 248 / 0.3) !important;
+  color: #c4dcff !important;
 }
 
 /* 窄面板隐藏视口坐标指示器（XYZ 彩色节点，alignment center-center 常驻画布中部），
