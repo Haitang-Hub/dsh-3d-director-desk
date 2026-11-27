@@ -674,6 +674,8 @@ export function CharacterPanel() {
                         </span>
                         <button
                           aria-label={`删除动作文件 ${animationAsset.name}`}
+                          className="ui-tip ui-tip--end"
+                          data-tip="删除动作文件"
                           type="button"
                           onClick={() => removeImportedAnimationAsset(animationAsset.id)}
                         >
@@ -708,8 +710,8 @@ export function CharacterPanel() {
                 </button>
                 <button
                   aria-label="预览当前路线点"
-                  title="定位预览"
-                  className="character-route-icon-button"
+                  data-tip="定位预览"
+                  className="character-route-icon-button ui-tip"
                   type="button"
                   disabled={!selectedRoutePoint}
                   onClick={() => {
@@ -720,8 +722,8 @@ export function CharacterPanel() {
                 </button>
                 <button
                   aria-label="在当前路线点后插入"
-                  title="在当前点后插入"
-                  className="character-route-icon-button"
+                  data-tip="在当前点后插入"
+                  className="character-route-icon-button ui-tip"
                   type="button"
                   disabled={!selectedRoutePoint || routePath.keyframes[routePath.keyframes.length - 1]?.id === selectedRoutePoint.id}
                   onClick={() => {
@@ -734,8 +736,8 @@ export function CharacterPanel() {
                 </button>
                 <button
                   aria-label="删除当前路线点"
-                  title="删除当前点"
-                  className="character-route-icon-button is-danger"
+                  data-tip="删除当前点"
+                  className="character-route-icon-button ui-tip is-danger"
                   type="button"
                   disabled={!selectedRoutePoint}
                   onClick={() => {

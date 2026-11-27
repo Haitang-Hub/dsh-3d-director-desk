@@ -195,7 +195,7 @@
   border: 0;
   border-radius: 999px;
   padding: 0;
-  color: rgb(255 255 255 / 0.72);
+  color: rgba(255, 255, 255, 0.85);
   background: rgb(0 0 0 / 0.52);
   box-shadow: none;
   opacity: 0;
@@ -506,8 +506,8 @@
 
 .imported-action-file > button:hover,
 .imported-action-file > button:focus-visible {
-  color: #ff8c91;
-  background: rgb(216 91 99 / 0.12);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.12);
 }
 
 .character-route-toolbar {
@@ -531,7 +531,7 @@
 .right-sidebar .right-inspector .character-route-toolbar .character-route-add {
   gap: 6px;
   color: #082517;
-  background: #71d49b;
+  background: rgb(var(--success-rgb));
   font-size: 11px;
   font-weight: 650;
 }
@@ -542,7 +542,7 @@
 }
 
 .right-sidebar .right-inspector .character-route-toolbar .character-route-icon-button.is-danger {
-  color: #f0a2a2;
+  color: rgb(var(--danger-rgb));
 }
 
 .character-route-shape {
@@ -580,9 +580,9 @@
 }
 
 .character-route-shape button[aria-pressed="true"] {
-  border-color: rgb(113 212 155 / 0.78);
-  color: #bff5d3;
-  background: rgb(113 212 155 / 0.15);
+  border-color: rgb(var(--success-rgb) / 0.78);
+  color: rgb(var(--success-rgb));
+  background: rgb(var(--success-rgb) / 0.15);
 }
 
 .character-route-points {
@@ -616,7 +616,7 @@
   height: 20px;
   border-radius: 50%;
   color: #062515;
-  background: #71d49b;
+  background: rgb(var(--success-rgb));
   font-size: 10px;
 }
 
@@ -626,9 +626,9 @@
 }
 
 .character-route-points button.is-active {
-  border-color: rgb(113 212 155 / 0.82);
+  border-color: rgb(var(--success-rgb) / 0.82);
   color: rgb(var(--text-rgb));
-  background: rgb(113 212 155 / 0.13);
+  background: rgb(var(--success-rgb) / 0.13);
 }
 
 .character-route-editor {
@@ -721,7 +721,7 @@
   width: 100%;
   height: 40px;
   border-radius: 8px;
-  color: #ffffff;
+  color: rgb(var(--on-accent-rgb));
   background: rgb(var(--accent-rgb));
   font-size: 12px;
   font-weight: 600;
@@ -784,7 +784,7 @@
   height: 34px;
   grid-row: 1 / span 2;
   border-radius: 8px;
-  color: #ffffff;
+  color: rgb(var(--on-accent-rgb));
   background: rgb(var(--accent-rgb));
 }
 
@@ -936,19 +936,19 @@
   gap: 6px;
   width: 100%;
   height: 34px;
-  border: 1px solid rgb(239 68 68 / 0.24);
+  border: 1px solid rgb(var(--danger-rgb) / 0.24);
   border-radius: 8px;
-  color: rgb(248 113 113);
-  background: rgb(239 68 68 / 0.06);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.06);
   font-size: 11px;
   font-weight: 600;
 }
 
 .camera-motion-delete-button:hover,
 .camera-motion-delete-button:focus-visible {
-  border-color: rgb(239 68 68 / 0.42);
-  color: rgb(254 202 202);
-  background: rgb(239 68 68 / 0.12);
+  border-color: rgb(var(--danger-rgb) / 0.42);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.12);
 }
 
 .camera-preview-card {

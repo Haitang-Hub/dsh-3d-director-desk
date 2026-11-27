@@ -474,11 +474,11 @@
   align-items: center;
   gap: 8px;
   padding: 7px;
-  border: 1px solid rgb(96 165 250 / 0.32);
+  border: 1px solid rgb(var(--accent-rgb) / 0.32);
   border-radius: 12px;
   color: rgb(var(--text-rgb));
-  background: rgb(5 12 24 / 0.82);
-  box-shadow: 0 14px 38px rgb(0 0 0 / 0.3);
+  background: rgb(var(--panel-rgb) / 0.82);
+  box-shadow: 0 14px 38px rgb(var(--text-rgb) / 0.04);
   transform: translateX(-50%);
   backdrop-filter: blur(14px);
 }
@@ -492,7 +492,7 @@
 }
 
 .camera-preview-hud-status > svg {
-  color: #60a5fa;
+  color: rgb(var(--accent-rgb));
 }
 
 .camera-preview-hud-status > span {
@@ -519,17 +519,17 @@
   gap: 5px;
   height: 30px;
   padding: 0 9px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--text-rgb) / 0.14);
   border-radius: 8px;
-  color: rgb(255 255 255 / 0.78);
-  background: rgb(255 255 255 / 0.06);
+  color: rgb(var(--text-rgb) / 0.78);
+  background: rgb(var(--text-rgb) / 0.06);
   font-size: 10px;
 }
 
 .camera-preview-hud button:hover {
-  border-color: rgb(96 165 250 / 0.5);
-  color: #bfdbfe;
-  background: rgb(96 165 250 / 0.12);
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.12);
 }
 
 @media (max-width: 1100px) {

@@ -66,7 +66,8 @@ export function ViewportSensitivitySettings() {
     <div className="viewport-sensitivity-settings" ref={wrapperRef}>
       <button
         ref={triggerRef}
-        className={`viewport-sensitivity-trigger${open ? " is-active" : ""}`}
+        className={`viewport-sensitivity-trigger ui-tip${open ? " is-active" : ""}`}
+        data-tip="视角灵敏度"
         type="button"
         aria-controls="viewport-sensitivity-popover"
         aria-expanded={open}

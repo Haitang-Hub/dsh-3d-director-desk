@@ -190,17 +190,17 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
         <div className="dproj-list" aria-label="工程列表">
           {records.map((desk) => (
             <article key={desk.id} className={`dproj-row${desk.id === activeDeskId ? " is-active" : ""}`}>
-              <button className="dproj-row-main" type="button" onClick={() => openDesk(desk.id)} title="打开这个工程">
+              <button className="dproj-row-main" type="button" onClick={() => openDesk(desk.id)}>
                 <span className="dproj-row-number">{formatDeskNumber(desk)}</span>
                 <span className="dproj-row-name">{desk.name}{desk.id === activeDeskId ? "（当前）" : ""}</span>
                 <span className="dproj-row-meta">更新于 {formatUpdatedAt(desk.updatedAt)}</span>
               </button>
               <div className="dproj-row-actions">
                 <button
-                  className="dproj-row-button"
+                  className="dproj-row-button ui-tip"
                   type="button"
                   aria-label={`导出${desk.name}`}
-                  title="导出工程文件（.json）"
+                  data-tip="导出工程文件"
                   onClick={() => handleExportDesk(desk)}
                 >
                   <Download aria-hidden="true" size={14} strokeWidth={1.9} />
@@ -214,10 +214,10 @@ export function ProjectDirectoryPanel({ open, onClose, records, activeDeskId, on
                   onConfirm={() => handleDeleteDesk(desk)}
                 >
                   <button
-                    className="dproj-row-button is-danger"
+                    className="dproj-row-button ui-tip is-danger"
                     type="button"
                     aria-label={`删除${desk.name}`}
-                    title="删除这个工程"
+                    data-tip="删除这个工程"
                   >
                     <Trash2 aria-hidden="true" size={14} strokeWidth={1.9} />
                   </button>

@@ -635,7 +635,7 @@
 
 .panorama-import-error {
   margin: 0;
-  color: #f08d86;
+  color: rgb(var(--danger-rgb));
   font-size: 12px;
   line-height: 17px;
 }

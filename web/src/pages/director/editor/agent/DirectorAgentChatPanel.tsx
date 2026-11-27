@@ -739,10 +739,11 @@ export function DirectorAgentChatToggle() {
     const toggle = useDirectorAgentChat((state) => state.toggle);
     return (
         <button
-            className={`top-bar-motion-button${open ? " is-active" : ""}`}
+            className={`top-bar-motion-button ui-tip${open ? " is-active" : ""}`}
             type="button"
             aria-label={open ? "关闭 AI 助手" : "打开 AI 助手"}
             aria-pressed={open}
+            data-tip={open ? "关闭 AI 助手" : "AI 助手"}
             onClick={toggle}
         >
             <Bot aria-hidden="true" size={15} />

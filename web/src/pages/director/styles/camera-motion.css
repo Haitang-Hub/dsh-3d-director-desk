@@ -21,9 +21,9 @@
 
 .top-bar-motion-button:hover,
 .top-bar-motion-button.is-active {
-  border-color: rgb(245 166 91 / 0.52);
-  color: #f5a65b;
-  background: rgb(245 166 91 / 0.1);
+  border-color: rgb(var(--warning-rgb) / 0.52);
+  color: rgb(var(--warning-rgb));
+  background: rgb(var(--warning-rgb) / 0.1);
 }
 
 .motion-studio {
@@ -230,7 +230,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #71d49b;
+  color: rgb(var(--success-rgb));
   font-size: 9px;
 }
 
@@ -326,7 +326,7 @@
 .motion-export-confirm {
   padding: 0 9px;
   color: #082517;
-  background: #71d49b;
+  background: rgb(var(--success-rgb));
 }
 
 .motion-studio-close:hover {
@@ -742,8 +742,8 @@
 }
 
 .motion-selected-actions button.is-danger:hover {
-  border-color: rgb(248 113 113 / 0.42);
-  color: #f87171;
+  border-color: rgb(var(--danger-rgb) / 0.42);
+  color: rgb(var(--danger-rgb));
 }
 
 .motion-settings-column {
@@ -912,7 +912,7 @@
 
 .motion-object-track-label svg {
   flex: 0 0 auto;
-  color: #7dd3fc;
+  color: rgb(var(--accent-rgb));
 }
 
 .motion-object-track > small {
@@ -936,17 +936,17 @@
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
-  border: 1px solid rgb(125 211 252 / 0.34);
+  border: 1px solid rgb(var(--accent-rgb) / 0.34);
   border-radius: 6px;
-  color: #7dd3fc;
-  background: rgb(125 211 252 / 0.07);
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.07);
   font-size: 9px;
 }
 
 .motion-object-keyframes button.is-current {
-  border-color: rgb(125 211 252 / 0.8);
-  background: rgb(125 211 252 / 0.16);
-  box-shadow: 0 0 0 2px rgb(125 211 252 / 0.08);
+  border-color: rgb(var(--accent-rgb) / 0.8);
+  background: rgb(var(--accent-rgb) / 0.16);
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.08);
 }
 
 .motion-object-record,
@@ -954,10 +954,10 @@
   justify-content: center;
   gap: 4px;
   height: 27px;
-  border: 1px solid rgb(125 211 252 / 0.32);
+  border: 1px solid rgb(var(--accent-rgb) / 0.32);
   border-radius: 7px;
-  color: #7dd3fc;
-  background: rgb(125 211 252 / 0.07);
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.07);
   font-size: 9px;
   white-space: nowrap;
 }
@@ -970,7 +970,7 @@
 .motion-object-delete {
   width: 27px;
   padding: 0;
-  border-color: rgb(248 113 113 / 0.28);
-  color: #fca5a5;
-  background: rgb(248 113 113 / 0.06);
+  border-color: rgb(var(--danger-rgb) / 0.28);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.06);
 }

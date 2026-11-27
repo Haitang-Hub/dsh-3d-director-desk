@@ -183,10 +183,11 @@ export function ExportPanel() {
       <button
         ref={triggerRef}
         aria-label="导出"
+        data-tip="导出"
         aria-controls="export-panel-popover"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`export-trigger${open ? " is-active" : ""}`}
+        className={`export-trigger ui-tip${open ? " is-active" : ""}`}
         type="button"
         onClick={() => setOpen((current) => !current)}
       >

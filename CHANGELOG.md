@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.3.26 - 2026-11-27
+
++ [变更] 主题色板收敛到 DSH design-platform：新增 web/src/lib/design-tokens.ts（静态调色板 neutral-bluish / deepseek 品牌蓝 + 语义令牌 bg/label/border/accent 浅深两态）与 canvas/sceneThemeColors.ts（3D 场景环境色跟随主题），组件不再写死十六进制色值。
++ [变更] antd 主题令牌改由 designTokens 派生（colorPrimary 取品牌中性色、colorInfo/colorLink 取品牌蓝、悬浮/选中态取 interactive-bg-hover/active），cssVar key 由 infinite-canvas-* 改为 director-desk-*，避免与画布插件同名变量串色。
++ [变更] 面板图标按钮原生 title 提示统一改为 data-tip 气泡（28 处），样式与深浅色主题同步，不再出现浏览器默认黑底提示框。
++ [修复] start.bat 复用 5080 / 17372 之前先校验是不是本应用：端口被僵尸或其它程序占用时此前会误判"已在运行"直接开浏览器，得到白屏；现在按 index.html 的 theme_store 标记与 /health 的 director-desk 标识判定，占用方不是本应用则报错提示释放端口。
+
 ## v0.3.25 - 2026-11-27
 
 + [变更] 插件壳右侧栏标签移除工具栏（连接状态 UI + 新窗口/重启/刷新按钮，连接全自动，与无限画布同步）。

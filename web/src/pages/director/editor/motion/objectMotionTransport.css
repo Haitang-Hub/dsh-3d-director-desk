@@ -1,5 +1,5 @@
 .object-motion-transport {
-  --object-motion-accent-rgb: 125 211 252;
+  --object-motion-accent-rgb: var(--accent-rgb);
   position: absolute;
   left: 50%;
   bottom: 18px;
@@ -77,11 +77,11 @@
   height: 4px;
   margin-left: 4px;
   border-radius: 1px;
-  background: #4ade80;
+  background: rgb(var(--success-rgb));
 }
 
 .object-motion-transport__tracks-heading i.is-hold {
-  background: #facc15;
+  background: rgb(var(--warning-rgb));
 }
 
 .object-motion-transport__tracks-heading i.is-playhead {
@@ -137,17 +137,17 @@
 }
 
 .object-motion-transport__track--camera .object-motion-transport__span.is-move {
-  background: #f5a65b;
+  background: rgb(var(--warning-rgb));
 }
 
 .object-motion-transport__track--object .object-motion-transport__span.is-move {
-  background: #4ade80;
+  background: rgb(var(--success-rgb));
 }
 
 .object-motion-transport__span.is-hold {
   z-index: 2;
-  background: #facc15;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.28);
+  background: rgb(var(--warning-rgb));
+  box-shadow: inset 0 0 0 1px rgb(var(--text-rgb) / 0.28);
 }
 
 .object-motion-transport__span.is-active {
@@ -162,8 +162,8 @@
   bottom: 1px;
   width: 3px;
   border-radius: 2px;
-  background: #050505;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.88), 0 1px 3px rgb(0 0 0 / 0.55);
+  background: rgb(var(--text-rgb));
+  box-shadow: 0 0 0 1px rgb(var(--bg-rgb) / 0.88), 0 1px 3px rgb(0 0 0 / 0.55);
   transform: translateX(-1.5px);
   pointer-events: none;
 }
@@ -298,13 +298,13 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  color: rgb(7 19 27);
+  color: rgb(var(--on-accent-rgb));
   background: rgb(var(--object-motion-accent-rgb));
   box-shadow: 0 0 0 3px rgb(var(--object-motion-accent-rgb) / 0.1);
 }
 
 .object-motion-transport__play:hover {
-  background: rgb(186 230 253);
+  background: rgb(var(--accent-hover-rgb));
 }
 
 .object-motion-transport__play svg[data-lucide="play"] {
@@ -355,7 +355,7 @@
   min-width: 64px;
   height: 30px;
   padding: 0 8px;
-  border: 1px solid rgb(255 255 255 / 0.72);
+  border: 1px solid rgb(var(--border-rgb) / 0.72);
   border-radius: 6px;
   color: #080a0d;
   background: #f4f5f6;
@@ -463,15 +463,15 @@
 }
 
 .object-motion-transport__delete {
-  border: 1px solid rgb(248 113 113 / 0.25);
-  color: #fca5a5;
-  background: rgb(248 113 113 / 0.06);
+  border: 1px solid rgb(var(--danger-rgb) / 0.25);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.06);
   font-size: 9px;
 }
 
 .object-motion-transport__delete:hover:not(:disabled) {
-  border-color: rgb(248 113 113 / 0.46);
-  background: rgb(248 113 113 / 0.12);
+  border-color: rgb(var(--danger-rgb) / 0.46);
+  background: rgb(var(--danger-rgb) / 0.12);
 }
 
 .object-motion-transport__route-hint {
@@ -592,7 +592,6 @@
 
 /* Compact floating transport used by the editor chrome refresh. */
 .app-shell .object-motion-transport {
-  --object-motion-accent-rgb: 110 181 245;
   bottom: 16px;
   border: 0;
   border-radius: 16px;
@@ -623,7 +622,7 @@
 .app-shell .object-motion-transport__play {
   width: 28px;
   height: 28px;
-  color: #07111d;
+  color: rgb(var(--on-accent-rgb));
   background: rgb(var(--object-motion-accent-rgb));
 }
 
@@ -698,7 +697,7 @@
   height: 28px;
   min-height: 28px;
   padding: 0;
-  color: #b9dcfa;
+  color: rgb(var(--object-motion-accent-rgb));
   background: rgb(var(--object-motion-accent-rgb) / 0.1);
 }
 

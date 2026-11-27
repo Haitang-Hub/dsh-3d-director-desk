@@ -1,9 +1,10 @@
 import { Html, Line, TransformControls, type TransformControlsProps } from "@react-three/drei";
-import { useLoader, type ThreeEvent } from "@react-three/fiber";
+import { useLoader, useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import { Box3, Color, Vector3, type Group, type Object3D } from "three";
+import { Box3, Color, Vector3, type Group, type MeshStandardMaterial, type Object3D } from "three";
 import type { TransformControls as TransformControlsImpl } from "three-stdlib";
 import type { Line2 } from "three-stdlib";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -1282,16 +1283,40 @@ export function SceneRoot({ renderMode = "interactive" }: { renderMode?: SceneRo
       : null,
     [scene.groundMaterialPreset, scene.groundTextureScale, scene.showGround]
   );
-  const groundColor = useMemo(
-    () => {
-      const selectedColor = scene.groundColor.toLowerCase() === "#303640"
-        ? groundMaterialPreset.baseColor
-        : scene.groundColor;
-      return `#${new Color(selectedColor).multiplyScalar(Math.max(0, scene.groundBrightness)).getHexString()}`;
-    },
-    [groundMaterialPreset.baseColor, scene.groundBrightness, scene.groundColor]
-  );
+  const theme = useThemeStore((state) => state.theme);
+  const groundColorTarget = useMemo(() => {
+    const selectedColor = scene.groundColor.toLowerCase() === "#303640"
+      ? groundMaterialPreset.baseColor
+      : scene.groundColor;
+    const displayColor = new Color(selectedColor).multiplyScalar(Math.max(0, scene.groundBrightness));
+
+    // 地面贴图自带底色（预设 baseColor），材质色是乘算。
+    // 浅色主题下反算材质色，让最终地面呈现目标浅色，而不是被贴图压暗。
+    if (theme === "light" && groundTexture) {
+      const base = new Color(groundMaterialPreset.baseColor);
+      displayColor.setRGB(
+        displayColor.r / Math.max(base.r, 0.02),
+        displayColor.g / Math.max(base.g, 0.02),
+        displayColor.b / Math.max(base.b, 0.02)
+      );
+    }
+
+    return displayColor;
+  }, [groundMaterialPreset.baseColor, groundTexture, scene.groundBrightness, scene.groundColor, theme]);
   useEffect(() => () => groundTexture?.dispose(), [groundTexture]);
+  // 地面色按帧插值，主题切换时与天空同步渐变
+  const groundMaterialRef = useRef<MeshStandardMaterial | null>(null);
+  const groundColorMaterialRef = useRef<MeshStandardMaterial | null>(null);
+  useFrame((_, delta) => {
+    const material = groundMaterialRef.current;
+    if (!material) return;
+    if (groundColorMaterialRef.current !== material) {
+      material.color.copy(groundColorTarget);
+      groundColorMaterialRef.current = material;
+      return;
+    }
+    material.color.lerp(groundColorTarget, 1 - Math.exp(-6 * Math.min(delta, 0.1)));
+  });
   const assetsById = useMemo(() => new Map(assets.map((item) => [item.id, item])), [assets]);
   const cameraObjectsByCameraId = useMemo(() => {
     return new Map(
@@ -1336,7 +1361,7 @@ export function SceneRoot({ renderMode = "interactive" }: { renderMode?: SceneRo
         <mesh position={[0, scene.groundHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[GROUND_PLANE_SIZE, GROUND_PLANE_SIZE]} />
           <meshStandardMaterial
-            color={groundColor}
+            ref={groundMaterialRef}
             map={groundTexture}
             metalness={groundMaterialPreset.metalness}
             opacity={getEffectiveGroundOpacity(scene.groundOpacity, false)}

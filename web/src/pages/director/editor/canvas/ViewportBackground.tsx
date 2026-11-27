@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BackSide,
   ClampToEdgeWrapping,
@@ -116,17 +116,32 @@ export function ViewportBackground({
     () => new Color("#ffffff").multiplyScalar(Math.max(0, backgroundBrightness)),
     [backgroundBrightness]
   );
+  // 天空色按帧插值，主题/亮度变化时是渐变过去而不是瞬切
+  const animatedColorRef = useRef(new Color(backgroundColor));
+  const animatedOnceRef = useRef(false);
+  const panoramaTexture = textureState.status === "ready" && projectionMode === "equirectangular"
+    ? textureState.texture
+    : null;
 
   useEffect(() => {
-    const nextBackground =
-      textureState.status === "ready" && projectionMode === "equirectangular" ? textureState.texture : fallbackColor;
-
-    scene.background = nextBackground;
+    scene.background = panoramaTexture ?? animatedColorRef.current;
     scene.backgroundBlurriness = 0;
     scene.backgroundIntensity = Math.max(0, backgroundBrightness);
-    scene.backgroundRotation.set(0, textureState.status === "ready" && projectionMode === "equirectangular" ? rotationY : 0, 0);
-    gl.setClearColor(fallbackColor, 1);
-  }, [backgroundBrightness, fallbackColor, gl, projectionMode, rotationY, scene, textureState]);
+    scene.backgroundRotation.set(0, panoramaTexture ? rotationY : 0, 0);
+  }, [backgroundBrightness, gl, panoramaTexture, rotationY, scene, textureState]);
+
+  useFrame((_, delta) => {
+    const current = animatedColorRef.current;
+    if (!animatedOnceRef.current) {
+      current.copy(fallbackColor);
+      animatedOnceRef.current = true;
+    } else {
+      current.lerp(fallbackColor, 1 - Math.exp(-6 * Math.min(delta, 0.1)));
+    }
+
+    if (!panoramaTexture) scene.background = current;
+    gl.setClearColor(current, 1);
+  });
 
   return (
     <>

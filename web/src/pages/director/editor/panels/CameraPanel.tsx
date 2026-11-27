@@ -381,7 +381,8 @@ export function CameraPanel() {
                 >
                   <button
                     aria-label={`删除截图 ${capture.name}`}
-                    className="camera-capture-action"
+                    className="camera-capture-action ui-tip ui-tip--end"
+                    data-tip="删除截图"
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation();

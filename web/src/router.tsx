@@ -10,7 +10,7 @@ const DirectorEditorPage = lazy(() => import("@/pages/director/editor-page"));
 
 function LazyDirectorEditorPage() {
     return (
-        <Suspense fallback={<div className="h-dvh w-full bg-black" />}>
+        <Suspense fallback={<div className="h-dvh w-full bg-background" />}>
             <DirectorEditorPage />
         </Suspense>
     );

@@ -1,12 +1,14 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpen, Cpu, FolderOpen, Route } from "lucide-react";
+import { BookOpen, Cpu, FolderOpen, Moon, Route, Sun } from "lucide-react";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { useConfigStore } from "@/stores/use-config-store";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { DirectorDeskShell } from "./app/layout/DirectorDeskShell";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
 import { ViewportSensitivitySettings } from "./editor/canvas/ViewportSensitivitySettings";
+import { getThemeSceneColorPatch } from "./editor/canvas/sceneThemeColors";
 import { ExportPanel } from "./editor/panels/ExportPanel";
 import { CanvasImportPanel } from "./editor/panels/CanvasImportPanel";
 import { ProjectDirectoryPanel } from "./editor/panels/ProjectDirectoryPanel";
@@ -135,6 +137,14 @@ export default function DirectorEditorPage() {
   const setViewMode = useDirectorStore((state) => state.setViewMode);
   const motionStudioOpen = useDirectorStore((state) => state.motionStudioOpen);
   const setMotionStudioOpen = useDirectorStore((state) => state.setMotionStudioOpen);
+  const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+
+  // 天空 / 地面默认色跟随明暗主题，用户自定义的颜色保持不变
+  useEffect(() => {
+    const patch = getThemeSceneColorPatch(useDirectorStore.getState().project.scene, theme);
+    if (patch) useDirectorStore.getState().updateScene(patch);
+  }, [theme]);
 
   // 场景加载：首次进入、工程目录切换、浏览器前进后退都经由 URL 参数驱动
   useEffect(() => {
@@ -231,7 +241,7 @@ export default function DirectorEditorPage() {
   return (
     <div className="h-dvh w-full overflow-hidden">
       <DirectorAgentBridge />
-      <div className="director-desk-app" data-theme="dark">
+      <div className="director-desk-app" data-theme={theme}>
         <DirectorAgentChatPanel />
       <AppConfigModal />
       <ProjectDirectoryPanel
@@ -245,10 +255,10 @@ export default function DirectorEditorPage() {
         <div className="app-shell">
           <header className="top-bar">
             <div className="top-bar-left">
-              <button className="top-bar-icon-button" type="button" aria-label="打开工程目录" onClick={() => setProjectDirectoryOpen(true)}>
+              <button className="top-bar-icon-button ui-tip" type="button" aria-label="打开工程目录" data-tip="工程目录" onClick={() => setProjectDirectoryOpen(true)}>
                 <FolderOpen aria-hidden="true" size={15} />
               </button>
-              <button className="top-bar-icon-button" type="button" aria-label="打开帮助文档" onClick={openHelpDocs}>
+              <button className="top-bar-icon-button ui-tip" type="button" aria-label="打开帮助文档" data-tip="帮助文档" onClick={openHelpDocs}>
                 <BookOpen aria-hidden="true" size={15} />
               </button>
               <DirectorDeskNameField
@@ -267,10 +277,10 @@ export default function DirectorEditorPage() {
                   导演视角
                 </button>
                 <button
-                  className={`mode-toggle-button ui-segmented-item ${viewMode === "camera" ? "ui-segmented-item-active" : ""}`}
+                  className={`mode-toggle-button ui-segmented-item ui-tip ${viewMode === "camera" ? "ui-segmented-item-active" : ""}`}
                   aria-label="第一视角"
                   aria-pressed={viewMode === "camera"}
-                  title="查看摄影机最终画面"
+                  data-tip="查看摄影机最终画面"
                   type="button"
                   onClick={() => setViewMode("camera")}
                 >
@@ -298,9 +308,19 @@ export default function DirectorEditorPage() {
             <div className="top-bar-right">
               <DirectorAgentChatToggle />
               <button
-                className="top-bar-motion-button"
+                className="top-bar-motion-button ui-tip"
+                type="button"
+                aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+                data-tip={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+                onClick={toggleTheme}
+              >
+                {theme === "dark" ? <Sun aria-hidden="true" size={15} /> : <Moon aria-hidden="true" size={15} />}
+              </button>
+              <button
+                className="top-bar-motion-button ui-tip"
                 type="button"
                 aria-label="打开模型配置"
+                data-tip="模型配置"
                 onClick={() => useConfigStore.getState().setConfigDialogOpen(true)}
               >
                 <Cpu aria-hidden="true" size={15} />

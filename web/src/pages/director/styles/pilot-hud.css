@@ -15,9 +15,9 @@
   gap: 7px;
   min-height: 30px;
   padding: 0 11px;
-  border: 1px solid rgb(74 222 128 / 0.28);
+  border: 1px solid rgb(var(--success-rgb) / 0.28);
   border-radius: 999px;
-  color: #86efac;
+  color: rgb(var(--success-rgb));
   background: rgb(5 15 12 / 0.76);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
   font-size: 11px;
@@ -45,8 +45,8 @@
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
 }
 
-.pilot-crosshair.is-pointing { color: #f7b955; }
-.pilot-crosshair.is-locked { color: #4ade80; }
+.pilot-crosshair.is-pointing { color: rgb(var(--warning-rgb)); }
+.pilot-crosshair.is-locked { color: rgb(var(--success-rgb)); }
 
 .pilot-crosshair-line,
 .pilot-crosshair-center {
@@ -174,9 +174,9 @@
 }
 
 .pilot-hud-primary {
-  border: 1px solid rgb(245 166 91 / 0.54);
+  border: 1px solid rgb(var(--warning-rgb) / 0.54);
   color: #fff;
-  background: rgb(183 100 28 / 0.8);
+  background: rgb(var(--warning-rgb) / 0.82);
   box-shadow: 0 7px 20px rgb(0 0 0 / 0.24);
 }
 

@@ -92,7 +92,8 @@ export function PerformanceSettings() {
         aria-controls="performance-settings-popover"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`performance-settings-trigger${open ? " is-active" : ""}`}
+        className={`performance-settings-trigger ui-tip${open ? " is-active" : ""}`}
+        data-tip="性能设置"
         type="button"
         onClick={() => setOpen((current) => !current)}
       >

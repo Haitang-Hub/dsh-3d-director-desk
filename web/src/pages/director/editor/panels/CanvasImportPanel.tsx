@@ -324,7 +324,8 @@ async function mergeFourScreenshotsToGrid(
         aria-controls="canvas-import-panel-popover"
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`export-trigger canvas-import-trigger${open ? " is-active" : ""}`}
+        className={`export-trigger canvas-import-trigger ui-tip${open ? " is-active" : ""}`}
+        data-tip="导入画布"
         type="button"
         onClick={() => setOpen((current) => !current)}
       >

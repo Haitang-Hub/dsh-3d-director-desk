@@ -1,4 +1,5 @@
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Move } from "lucide-react";
 import { flushSync } from "react-dom";
@@ -1006,6 +1007,7 @@ export function DirectorCanvas() {
     && (activeCameraMotionPath?.keyframes.length ?? 0) >= 2
     && !isCameraPiloting;
   const showViewportGrid = shouldRenderViewportGrid(sceneSettings.showGrid);
+  const theme = useThemeStore((state) => state.theme);
   const hasObjectMotion = useMemo(
     () => sceneObjects.some((item) =>
       (item.motionPath?.keyframes?.length ?? 0) >= 2 || Boolean(item.characterRig?.actionPresetId)
@@ -1424,7 +1426,7 @@ export function DirectorCanvas() {
               fadeDistance={80}
               infiniteGrid
               position={[0, sceneSettings.groundHeight + VIEWPORT_GRID_ELEVATION, 0]}
-              sectionColor="#2A4065"
+              sectionColor={theme === "light" ? "#b6c0cf" : "#2A4065"}
               userData={{ [HIDE_FROM_VIEWPORT_CAPTURE_KEY]: true }}
             />
           ) : null}

@@ -18,7 +18,7 @@
   padding: 64px clamp(24px, 6vw, 84px);
   background:
     radial-gradient(circle at 18% 12%, rgb(var(--accent-rgb) / 0.22), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(255, 255, 255, 0.08), transparent 24%),
+    radial-gradient(circle at 82% 0%, rgb(var(--text-rgb) / 0.06), transparent 24%),
     linear-gradient(135deg, rgb(var(--bg-rgb)), rgb(var(--surface-rgb) / 0.78));
 }
 
@@ -112,6 +112,12 @@
   background: rgb(var(--accent-rgb) / 0.08);
 }
 
+/* 帮助页右上角的明暗切换，与左侧「返回导演台」同一套按钮样式 */
+.director-home-theme-toggle {
+  right: clamp(24px, 6vw, 84px);
+  left: auto;
+}
+
 .director-home-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -160,7 +166,7 @@
   background:
     linear-gradient(135deg, rgb(var(--panel-rgb) / 0.98), rgb(var(--surface-rgb) / 0.76)),
     rgb(var(--panel-rgb));
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 16px 44px rgb(var(--overlay-rgb) / 0.16);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -196,7 +202,7 @@
 .director-home-card:hover,
 .director-home-card.is-active {
   border-color: rgb(var(--accent-rgb) / 0.48);
-  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 22px 58px rgb(var(--overlay-rgb) / 0.24);
   transform: translateY(-2px);
 }
 
@@ -312,9 +318,9 @@
 }
 
 .director-home-card-delete:hover {
-  border-color: rgba(248, 113, 113, 0.55);
-  color: #f87171;
-  background: rgba(127, 29, 29, 0.22);
+  border-color: rgb(var(--danger-rgb) / 0.55);
+  color: rgb(var(--danger-rgb));
+  background: rgb(var(--danger-rgb) / 0.14);
 }
 
 .director-home-guide,
@@ -602,7 +608,7 @@
 .director-home-release-list svg {
   flex: 0 0 auto;
   margin-top: 1px;
-  color: #71d49b;
+  color: rgb(var(--success-rgb));
 }
 
 @media (max-width: 900px) {
@@ -619,6 +625,11 @@
   .director-home-back {
     top: 6px;
     left: 16px;
+  }
+
+  .director-home-theme-toggle {
+    right: 16px;
+    left: auto;
   }
 
   .director-home-hero {
@@ -809,6 +820,92 @@
 
 .top-bar-center {
   justify-content: center;
+}
+
+/* 图标按钮的悬停提示：与视口工具栏保持一致的自绘胶囊，替代原生 title 气泡 */
+.ui-tip {
+  position: relative;
+}
+
+.ui-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  z-index: 70;
+  width: max-content;
+  max-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid rgb(var(--border-rgb) / 0.5);
+  border-radius: 8px;
+  color: rgb(var(--text-rgb));
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+  background: rgb(var(--panel-rgb) / 0.96);
+  box-shadow: var(--ui-shadow-panel);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -2px);
+  transition:
+    opacity 0.14s ease 0.3s,
+    transform 0.14s ease 0.3s,
+    visibility 0.14s ease 0.3s;
+}
+
+.ui-tip:hover::after,
+.ui-tip:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+/* 靠近视口底部的按钮（播放条、面板底部操作）提示向上弹出 */
+.ui-tip--up::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 2px);
+}
+
+.ui-tip--up:hover::after,
+.ui-tip--up:focus-visible::after {
+  transform: translate(-50%, 0);
+}
+
+/* 贴近容器右边缘的按钮（对象树行内图标）提示右对齐，避免被侧栏裁切 */
+.ui-tip--end::after {
+  left: auto;
+  right: 0;
+  transform: translateY(-2px);
+}
+
+.ui-tip--end:hover::after,
+.ui-tip--end:focus-visible::after {
+  transform: translateY(0);
+}
+
+/* 首尾按钮的提示贴边对齐，避免超出视口 */
+.app-shell .top-bar-right > .ui-tip:last-child::after {
+  left: auto;
+  right: 0;
+  transform: translateY(-2px);
+}
+
+.app-shell .top-bar-right > .ui-tip:last-child:hover::after,
+.app-shell .top-bar-right > .ui-tip:last-child:focus-visible::after {
+  transform: translateY(0);
+}
+
+.app-shell .top-bar-left > .ui-tip:first-child::after {
+  left: 0;
+  transform: translateY(-2px);
+}
+
+.app-shell .top-bar-left > .ui-tip:first-child:hover::after,
+.app-shell .top-bar-left > .ui-tip:first-child:focus-visible::after {
+  transform: translateY(0);
 }
 
 .top-bar-actions {
@@ -1450,26 +1547,13 @@
 
 /* Reference-led editor chrome: floating tool windows around an uninterrupted stage. */
 .app-shell {
-  --bg-rgb: 5 6 8;
-  --surface-rgb: 29 30 34;
-  --surface-hover-rgb: 38 40 45;
-  --panel-rgb: 18 19 22;
-  --field-rgb: 27 28 32;
-  --border-rgb: 55 57 63;
-  --text-rgb: 239 240 242;
-  --text-muted-rgb: 153 156 165;
-  --text-dim-rgb: 101 104 113;
-  --accent-rgb: 77 143 248;
-  --accent-hover-rgb: 105 163 250;
-  --overlay-rgb: 0 0 0;
   --left-sidebar-width: 230px;
   --right-sidebar-width: 230px;
   --left-sidebar-content-width: calc(var(--left-sidebar-width) - 24px);
   --right-sidebar-content-width: calc(var(--right-sidebar-width) - 24px);
-  --ui-shadow-panel: 0 10px 28px rgb(0 0 0 / 0.18);
+  --ui-shadow-panel: 0 10px 28px rgb(var(--overlay-rgb) / 0.16);
   position: relative;
   display: block;
-  color-scheme: dark;
   background: rgb(var(--bg-rgb));
   font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei UI", sans-serif;
 }
@@ -1480,8 +1564,8 @@
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgb(255 255 255 / 0.014) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.014) 1px, transparent 1px);
+    linear-gradient(rgb(var(--text-rgb) / 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--text-rgb) / 0.02) 1px, transparent 1px);
   background-size: 32px 32px;
   content: "";
   mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.25), transparent 62%);
@@ -1603,7 +1687,7 @@
   height: 32px;
   border-color: transparent;
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.05);
+  background: rgb(var(--text-rgb) / 0.05);
   font-size: 11px;
   line-height: 16px;
 }
@@ -1636,7 +1720,7 @@
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.03);
+  background: rgb(var(--text-rgb) / 0.04);
 }
 
 .app-shell .mode-toggle-button {
@@ -1649,8 +1733,8 @@
 
 .app-shell .mode-toggle-button[aria-pressed="true"] {
   border-color: transparent;
-  color: #ffffff;
-  background: rgb(37 137 255);
+  color: rgb(var(--on-accent-rgb));
+  background: rgb(var(--accent-rgb));
 }
 
 .app-shell .director-shell-fullbleed {
@@ -1661,7 +1745,7 @@
 
 .app-shell .viewport-column,
 .app-shell .director-canvas {
-  background: #030405;
+  background: rgb(var(--bg-rgb));
 }
 
 .app-shell .left-sidebar,
@@ -1728,7 +1812,7 @@
   height: 26px;
   border: 0;
   border-radius: 8px;
-  color: #bcd7ff;
+  color: rgb(var(--accent-rgb));
   background: rgb(var(--accent-rgb) / 0.12);
 }
 
@@ -1757,7 +1841,7 @@
   height: 32px;
   border: 0;
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.05);
+  background: rgb(var(--text-rgb) / 0.05);
   font-size: 11px;
   font-weight: 400;
 }
@@ -1785,7 +1869,7 @@
 }
 
 .app-shell .object-row[aria-selected="true"] {
-  color: #dceaff;
+  color: rgb(var(--text-rgb));
   background: rgb(var(--accent-rgb) / 0.16);
   box-shadow: inset 2px 0 0 rgb(var(--accent-rgb));
 }
@@ -1822,7 +1906,7 @@
 .app-shell .inspector-range-value,
 .app-shell .inspector-action-button {
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.05);
+  background: rgb(var(--text-rgb) / 0.05);
 }
 
 .app-shell .inspector-text-input,
@@ -1995,8 +2079,8 @@
 
 .app-shell .viewport-toolbar-button.ui-icon-button.is-active,
 .app-shell .viewport-toolbar-button.ui-icon-button[aria-pressed="true"] {
-  color: #dceaff;
-  background: rgb(37 137 255);
+  color: rgb(var(--on-accent-rgb));
+  background: rgb(var(--accent-rgb));
   box-shadow: none;
 }
 
@@ -2359,7 +2443,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(0 0 0 / 0.72);
+  background: rgb(var(--overlay-rgb) / 0.6);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
@@ -2370,14 +2454,14 @@
   width: min(560px, 100%);
   max-height: min(76vh, 680px);
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.1);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 16px;
-  background: linear-gradient(180deg, #0b0e15, #06080d);
+  background: linear-gradient(180deg, rgb(var(--panel-rgb)), rgb(var(--bg-rgb)));
   color: rgb(var(--text-rgb));
   box-shadow:
-    0 24px 80px rgb(0 0 0 / 0.65),
-    0 0 0 1px rgb(0 0 0 / 0.5),
-    0 0 60px rgb(77 143 248 / 0.07);
+    0 24px 80px rgb(var(--overlay-rgb) / 0.45),
+    0 0 0 1px rgb(var(--overlay-rgb) / 0.28),
+    0 0 60px rgb(var(--accent-rgb) / 0.07);
   font-family: inherit;
 }
 
@@ -2387,7 +2471,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 18px 18px 14px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  border-bottom: 1px solid rgb(var(--text-rgb) / 0.08);
 }
 
 .dproj-head-text h2 {
@@ -2397,14 +2481,14 @@
   margin: 0;
   font-size: 16px;
   font-weight: 650;
-  color: rgb(255 255 255 / 0.92);
+  color: rgb(var(--text-rgb));
 }
 
 .dproj-head-text p {
   margin: 6px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: rgb(255 255 255 / 0.52);
+  color: rgb(var(--text-muted-rgb));
 }
 
 .dproj-head-actions {
@@ -2420,10 +2504,10 @@
   gap: 6px;
   height: 30px;
   padding: 0 12px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--border-rgb) / 0.9);
   border-radius: 9px;
-  background: rgb(255 255 255 / 0.06);
-  color: rgb(255 255 255 / 0.85);
+  background: rgb(var(--text-rgb) / 0.05);
+  color: rgb(var(--text-rgb));
   font-size: 12.5px;
   font-weight: 560;
   font-family: inherit;
@@ -2432,8 +2516,8 @@
 }
 
 .dproj-action-button:hover {
-  background: rgb(77 143 248 / 0.16);
-  border-color: rgb(77 143 248 / 0.55);
+  background: rgb(var(--accent-rgb) / 0.14);
+  border-color: rgb(var(--accent-rgb) / 0.55);
 }
 
 .dproj-close-button {
@@ -2441,17 +2525,17 @@
   place-items: center;
   width: 30px;
   height: 30px;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--border-rgb) / 0.9);
   border-radius: 9px;
   background: transparent;
-  color: rgb(255 255 255 / 0.6);
+  color: rgb(var(--text-muted-rgb));
   cursor: pointer;
   transition: color 0.16s ease, background 0.16s ease;
 }
 
 .dproj-close-button:hover {
-  color: rgb(255 255 255 / 0.92);
-  background: rgb(255 255 255 / 0.08);
+  color: rgb(var(--text-rgb));
+  background: rgb(var(--text-rgb) / 0.08);
 }
 
 .dproj-list {
@@ -2477,9 +2561,9 @@
   flex: 1;
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid rgb(255 255 255 / 0.1);
+  border: 1px solid rgb(var(--border-rgb) / 0.9);
   border-radius: 11px;
-  background: rgb(255 255 255 / 0.04);
+  background: rgb(var(--text-rgb) / 0.04);
   color: inherit;
   text-align: left;
   font-family: inherit;
@@ -2489,18 +2573,18 @@
 
 .dproj-row-main:hover,
 .dproj-row.is-active .dproj-row-main {
-  border-color: rgb(77 143 248 / 0.55);
-  background: rgb(77 143 248 / 0.1);
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  background: rgb(var(--accent-rgb) / 0.1);
 }
 
 .dproj-row-number {
   flex-shrink: 0;
   min-width: 38px;
   padding: 2px 7px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--border-rgb) / 0.9);
   border-radius: 7px;
-  background: rgb(255 255 255 / 0.07);
-  color: rgb(255 255 255 / 0.72);
+  background: rgb(var(--text-rgb) / 0.06);
+  color: rgb(var(--text-muted-rgb));
   font-size: 12px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -2508,8 +2592,8 @@
 }
 
 .dproj-row.is-active .dproj-row-number {
-  border-color: rgb(77 143 248 / 0.6);
-  color: rgb(122 172 255);
+  border-color: rgb(var(--accent-rgb) / 0.6);
+  color: rgb(var(--accent-rgb));
 }
 
 .dproj-row-name {
@@ -2520,13 +2604,13 @@
   white-space: nowrap;
   font-size: 13.5px;
   font-weight: 560;
-  color: rgb(255 255 255 / 0.88);
+  color: rgb(var(--text-rgb));
 }
 
 .dproj-row-meta {
   flex-shrink: 0;
   font-size: 11.5px;
-  color: rgb(255 255 255 / 0.45);
+  color: rgb(var(--text-muted-rgb));
 }
 
 .dproj-row-actions {
@@ -2540,24 +2624,24 @@
   place-items: center;
   width: 40px;
   height: 32px;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--border-rgb) / 0.9);
   border-radius: 8px;
-  background: rgb(255 255 255 / 0.04);
-  color: rgb(255 255 255 / 0.62);
+  background: rgb(var(--text-rgb) / 0.04);
+  color: rgb(var(--text-muted-rgb));
   cursor: pointer;
   transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .dproj-row-button:hover {
-  color: rgb(255 255 255 / 0.95);
-  border-color: rgb(77 143 248 / 0.55);
-  background: rgb(77 143 248 / 0.14);
+  color: rgb(var(--text-rgb));
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  background: rgb(var(--accent-rgb) / 0.14);
 }
 
 .dproj-row-button.is-danger:hover {
-  color: #ff8f8f;
-  border-color: rgb(226 82 82 / 0.6);
-  background: rgb(226 82 82 / 0.12);
+  color: rgb(var(--danger-rgb));
+  border-color: rgb(var(--danger-rgb) / 0.6);
+  background: rgb(var(--danger-rgb) / 0.12);
 }
 
 .dproj-empty {
@@ -2566,43 +2650,43 @@
   align-items: center;
   gap: 8px;
   padding: 36px 0;
-  color: rgb(255 255 255 / 0.4);
+  color: rgb(var(--text-muted-rgb));
   font-size: 13px;
 }
 
 .dproj-foot {
   padding: 12px 18px 14px;
-  border-top: 1px solid rgb(255 255 255 / 0.08);
+  border-top: 1px solid rgb(var(--text-rgb) / 0.08);
   font-size: 11.5px;
   line-height: 1.55;
-  color: rgb(255 255 255 / 0.45);
+  color: rgb(var(--text-muted-rgb));
 }
 
 /* 工程删除确认气泡：覆写为与所在 .dproj-modal 完全一致的深色主题（同底色、描边、圆角、按钮）。
    选择器要叠够优先级：antd cssinjs 生成 .css-xxx.ant-popover .ant-popover-inner 这类带哈希类的
    三段选择器（0,3,0），普通两段覆写压不过，这里统一用重复类名提到 (0,4,0)。 */
 .dproj-popconfirm.dproj-popconfirm.dproj-popconfirm .ant-popover-inner {
-  border: 1px solid rgb(255 255 255 / 0.1);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 16px;
-  background: linear-gradient(180deg, #0b0e15, #06080d);
+  background: linear-gradient(180deg, rgb(var(--panel-rgb)), rgb(var(--bg-rgb)));
   box-shadow:
-    0 24px 80px rgb(0 0 0 / 0.65),
-    0 0 0 1px rgb(0 0 0 / 0.5),
-    0 0 60px rgb(77 143 248 / 0.07);
+    0 24px 80px rgb(var(--overlay-rgb) / 0.45),
+    0 0 0 1px rgb(var(--overlay-rgb) / 0.28),
+    0 0 60px rgb(var(--accent-rgb) / 0.07);
   padding: 14px 16px;
 }
 
 .dproj-popconfirm.dproj-popconfirm.dproj-popconfirm .ant-popover-arrow::before {
-  border: 1px solid rgb(255 255 255 / 0.1);
-  background: #070a10;
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
+  background: rgb(var(--bg-rgb));
 }
 
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-message-icon {
-  color: rgb(238 178 88);
+  color: rgb(var(--warning-rgb));
 }
 
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-title {
-  color: rgb(255 255 255 / 0.92);
+  color: rgb(var(--text-rgb));
   font-weight: 650;
   font-size: 14px;
 }
@@ -2620,30 +2704,30 @@
 }
 
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-default {
-  border-color: rgb(255 255 255 / 0.14);
-  background: rgb(255 255 255 / 0.06);
-  color: rgb(255 255 255 / 0.85);
+  border-color: rgb(var(--border-rgb) / 0.9);
+  background: rgb(var(--text-rgb) / 0.05);
+  color: rgb(var(--text-rgb));
   box-shadow: none;
 }
 
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-default:hover {
-  border-color: rgb(77 143 248 / 0.55) !important;
-  background: rgb(77 143 248 / 0.16) !important;
-  color: rgb(255 255 255 / 0.95) !important;
+  border-color: rgb(var(--accent-rgb) / 0.55) !important;
+  background: rgb(var(--accent-rgb) / 0.14) !important;
+  color: rgb(var(--text-rgb)) !important;
 }
 
-/* 删除确认按钮：对齐工程目录主题的深蓝色强调色 */
+/* 删除确认按钮：对齐工程目录主题的品牌强调色 */
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.dproj-confirm-ok {
-  border-color: rgb(77 143 248 / 0.6);
-  background: rgb(77 143 248 / 0.18);
+  border-color: rgb(var(--accent-rgb) / 0.6);
+  background: rgb(var(--accent-rgb) / 0.16);
   box-shadow: none;
-  color: #a8c9ff;
+  color: rgb(var(--accent-rgb));
 }
 
 .dproj-popconfirm.dproj-popconfirm .ant-popconfirm-buttons .ant-btn-primary.dproj-confirm-ok:hover {
-  border-color: rgb(77 143 248 / 0.85) !important;
-  background: rgb(77 143 248 / 0.3) !important;
-  color: #c4dcff !important;
+  border-color: rgb(var(--accent-rgb) / 0.85) !important;
+  background: rgb(var(--accent-rgb) / 0.26) !important;
+  color: rgb(var(--accent-rgb)) !important;
 }
 
 /* 窄面板隐藏视口坐标指示器（XYZ 彩色节点，alignment center-center 常驻画布中部），

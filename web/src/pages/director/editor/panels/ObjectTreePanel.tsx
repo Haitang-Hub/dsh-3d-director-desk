@@ -499,9 +499,10 @@ export function ObjectTreePanel() {
                         {item.object ? (
                           <>
                             <button
-                              className="object-flag-button object-icon-flag-button"
+                              className="object-flag-button object-icon-flag-button ui-tip ui-tip--end"
                               type="button"
                               aria-label={`${item.name} 可见性`}
+                              data-tip={item.object.visible ? "隐藏" : "显示"}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 toggleObjectVisible(item.id);
@@ -514,9 +515,10 @@ export function ObjectTreePanel() {
                               )}
                             </button>
                             <button
-                              className="object-flag-button object-icon-flag-button"
+                              className="object-flag-button object-icon-flag-button ui-tip ui-tip--end"
                               type="button"
                               aria-label={`${item.name} 锁定`}
+                              data-tip={item.object.locked ? "解锁" : "锁定"}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 toggleObjectLocked(item.id);

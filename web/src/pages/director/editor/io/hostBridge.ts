@@ -1,3 +1,4 @@
+import { useThemeStore } from "@/stores/use-theme-store";
 import { useDirectorStore } from "../store/directorStore";
 import { readDirectorDeskRecords } from "../workspaces/directorDeskRegistry";
 import {
@@ -84,10 +85,9 @@ function normalizeTheme(value: unknown): "dark" | "light" | null {
   return value === "light" || value === "dark" ? value : null;
 }
 
+/** 宿主下发的主题统一写进 store：AppProviders 负责 html.dark，编辑器根节点负责 data-theme。 */
 function applyDirectorDeskTheme(theme: "dark" | "light") {
-  const scopeRoot = document.querySelector(".director-desk-app") ?? document.documentElement;
-  scopeRoot.setAttribute("data-theme", theme);
-  scopeRoot.classList.toggle("dark", theme === "dark");
+  useThemeStore.getState().setTheme(theme);
 }
 
 function getInitialHostTheme() {
@@ -432,7 +432,7 @@ export function initDirectorDeskHostBridge() {
   }
 
   initialized = true;
-  applyDirectorDeskTheme(getInitialHostTheme() ?? "dark");
+  applyDirectorDeskTheme(getInitialHostTheme() ?? useThemeStore.getState().theme);
   window.addEventListener("message", handleHostMessage);
   window.addEventListener("message", handleRegistryQuery);
   void initTauriDirectorHostTransport(handleHostProtocolMessage).then((cleanup) => {

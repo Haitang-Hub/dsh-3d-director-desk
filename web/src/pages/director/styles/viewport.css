@@ -644,15 +644,15 @@
   padding: 0 8px;
   border-radius: 4px;
   color: #ffffff;
-  background: #58616e;
+  background: rgb(var(--text-dim-rgb));
   font-size: 12px;
   font-weight: 700;
 }
 
-.character-import-status.is-ready { background: #18825b; }
-.character-import-status.is-native-only { background: #296da8; }
-.character-import-status.is-manual-mapping { background: #9a671d; }
-.character-import-status.is-static-only { background: #8a4650; }
+.character-import-status.is-ready { background: rgb(var(--success-rgb)); }
+.character-import-status.is-native-only { background: rgb(var(--accent-rgb)); }
+.character-import-status.is-manual-mapping { background: rgb(var(--warning-rgb)); }
+.character-import-status.is-static-only { background: rgb(var(--danger-rgb)); }
 
 .character-import-metrics {
   display: grid;
@@ -702,7 +702,7 @@
 }
 
 .character-import-ready-copy { color: rgb(var(--text-muted-rgb)); }
-.character-import-error { color: #ff8c91; }
+.character-import-error { color: rgb(var(--danger-rgb)); }
 
 .character-import-mapping {
   border-top: 1px solid rgb(var(--border-rgb) / 0.72);
@@ -780,9 +780,9 @@
 }
 
 .character-import-actions button.is-primary {
-  border-color: #2f8d69;
+  border-color: rgb(var(--success-rgb) / 0.8);
   color: #ffffff;
-  background: #197653;
+  background: rgb(var(--success-rgb));
 }
 
 .character-import-actions button:disabled {
@@ -797,7 +797,7 @@
   z-index: 65;
   max-width: min(420px, calc(100% - 32px));
   padding: 8px 12px;
-  border: 1px solid rgb(216 91 99 / 0.55);
+  border: 1px solid rgb(var(--danger-rgb) / 0.55);
   border-radius: 6px;
   color: #ffd8da;
   background: rgb(104 34 40 / 0.92);
@@ -831,7 +831,7 @@
 .character-import-preview-bar span { overflow: hidden; color: rgb(var(--text-muted-rgb)); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .character-import-preview-steps { display: flex; gap: 4px; }
 .character-import-preview-steps i { width: 14px; height: 3px; border-radius: 2px; background: rgb(255 255 255 / 0.18); }
-.character-import-preview-steps i.is-active { background: #55c790; }
+.character-import-preview-steps i.is-active { background: rgb(var(--success-rgb)); }
 .character-import-preview-bar button { height: 28px; border: 1px solid rgb(var(--border-rgb) / 0.55); border-radius: 4px; padding: 0 9px; color: rgb(var(--text-rgb)); background: rgb(var(--surface-rgb) / 0.85); font-size: 11px; }
 
 .viewport-toolbar-button .viewport-toolbar-label {
@@ -1177,12 +1177,12 @@
 }
 
 .object-context-menu-item--danger {
-  color: rgb(220 60 60);
+  color: rgb(var(--danger-rgb));
 }
 
 .object-context-menu-item--danger:hover {
-  background: rgb(220 60 60 / 0.1);
-  color: rgb(200 40 40);
+  background: rgb(var(--danger-rgb) / 0.1);
+  color: rgb(var(--danger-rgb));
 }
 
 .object-tree-panel .object-name-input:focus {

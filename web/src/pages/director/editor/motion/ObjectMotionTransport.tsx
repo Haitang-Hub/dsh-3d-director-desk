@@ -314,11 +314,11 @@ export function ObjectMotionTransport() {
       <div className="object-motion-transport__editor">
         {!isCharacterRoute ? <>
           <button
-            className="object-motion-transport__record"
+            className="object-motion-transport__record ui-tip ui-tip--up"
             type="button"
             disabled={!selectedObject}
             aria-label={selectedObject ? `${recordLabel}：${selectedObject.name}` : "记录人物或道具动作点"}
-            title={recordLabel}
+            data-tip={recordLabel}
             onClick={() => {
               if (!selectedObject) return;
               setPlaying(false);
@@ -339,11 +339,11 @@ export function ObjectMotionTransport() {
             return (
               <button
                 key={keyframe.id}
-                className={isCurrent ? "is-current" : undefined}
+                className={`ui-tip ui-tip--up${isCurrent ? " is-current" : ""}`}
                 type="button"
                 aria-label={`跳转到${selectedObject?.name ?? "对象"}${pointLabel} ${index + 1}`}
                 aria-pressed={isCurrent}
-                title={`${formatSeconds((objectSpans?.arrivals[index] ?? keyframe.time) * duration)} · ${pointLabel} ${index + 1}`}
+                data-tip={`${formatSeconds((objectSpans?.arrivals[index] ?? keyframe.time) * duration)} · ${pointLabel} ${index + 1}`}
                 onClick={() => {
                   selectObjectMotionKeyframe(keyframe.id);
                   seek(objectSpans?.arrivals[index] ?? keyframe.time);
@@ -359,11 +359,11 @@ export function ObjectMotionTransport() {
         </> : <span className="object-motion-transport__route-hint">路线点、每段动作和朝向请在右侧“路线”页编辑</span>}
 
         <button
-          className="object-motion-transport__delete"
+          className="object-motion-transport__delete ui-tip ui-tip--up"
           type="button"
           disabled={isCharacterRoute || !selectedObject || !currentKeyframe}
           aria-label={selectedObject ? `删除${selectedObject.name}当前${pointLabel}` : "删除当前动作点"}
-          title="删除当前点"
+          data-tip="删除当前点"
           onClick={() => {
             if (!selectedObject || !currentKeyframe) return;
             setPlaying(false);

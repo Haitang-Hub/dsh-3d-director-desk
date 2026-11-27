@@ -181,8 +181,8 @@ export function ScenePanel() {
               <span className="panorama-thumbnail-name">{panoramaAsset.fileName}</span>
               <button
                 aria-label="删除全景图"
-                className="panorama-thumbnail-delete"
-                title="删除全景图"
+                className="panorama-thumbnail-delete ui-tip"
+                data-tip="删除全景图"
                 type="button"
                 onClick={() => {
                   removePanoramaAsset();
@@ -211,9 +211,9 @@ export function ScenePanel() {
             {panoramaAsset ? (
               <button
                 aria-label="恢复全景默认方向"
-                className="panorama-reset-button"
+                className="panorama-reset-button ui-tip"
                 disabled={scene.panoramaYaw === 0}
-                title="恢复默认方向"
+                data-tip="恢复默认方向"
                 type="button"
                 onClick={() => updateScene({ panoramaYaw: 0 })}
               >

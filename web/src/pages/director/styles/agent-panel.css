@@ -6,17 +6,17 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 16px;
   background: linear-gradient(
     165deg,
-    rgb(20 30 56 / var(--director-agent-glass-alpha, 0.68)),
-    rgb(8 12 24 / calc(var(--director-agent-glass-alpha, 0.68) + 0.06))
+    rgb(var(--panel-rgb) / var(--director-agent-glass-alpha, 0.68)),
+    rgb(var(--bg-rgb) / calc(var(--director-agent-glass-alpha, 0.68) + 0.06))
   );
   color: rgb(var(--text-rgb));
   box-shadow:
     0 24px 68px rgb(0 0 0 / 0.5),
-    inset 0 1px 0 rgb(255 255 255 / 0.09);
+    inset 0 1px 0 rgb(var(--text-rgb) / 0.09);
   backdrop-filter: blur(28px) saturate(170%);
   -webkit-backdrop-filter: blur(28px) saturate(170%);
   font-family: inherit;
@@ -30,7 +30,7 @@
   right: 12%;
   left: 12%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(160 195 255 / 0.55), transparent);
+  background: linear-gradient(90deg, transparent, rgb(var(--accent-rgb) / 0.55), transparent);
   pointer-events: none;
 }
 
@@ -64,7 +64,7 @@
 }
 
 .director-agent-panel-resize:hover {
-  background: linear-gradient(90deg, transparent, rgb(120 170 255 / 0.18));
+  background: linear-gradient(90deg, transparent, rgb(var(--accent-rgb) / 0.18));
 }
 
 .director-agent-panel.is-docked[data-dock="right"] .director-agent-panel-resize {
@@ -115,8 +115,8 @@
   gap: 8px;
   min-height: 40px;
   padding: 0 8px 0 12px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.07);
-  background: linear-gradient(90deg, rgb(77 143 248 / 0.1), transparent 60%);
+  border-bottom: 1px solid rgb(var(--text-rgb) / 0.07);
+  background: linear-gradient(90deg, rgb(var(--accent-rgb) / 0.1), transparent 60%);
   border-radius: 15px 15px 0 0;
   cursor: grab;
   user-select: none;
@@ -132,7 +132,7 @@
 .director-agent-panel.is-dragging {
   cursor: grabbing;
   transition: none;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.45);
+  box-shadow: 0 24px 60px rgb(var(--text-rgb) / 0.05);
   border-color: rgb(var(--accent-rgb) / 0.6);
 }
 
@@ -169,7 +169,7 @@
 
 .director-agent-panel-icon-button:hover {
   color: rgb(var(--text-rgb));
-  background: rgb(255 255 255 / 0.1);
+  background: rgb(var(--text-rgb) / 0.1);
 }
 
 /* 风格化 tooltip：深色圆角白字，替代原生 title 系统气泡 */
@@ -190,12 +190,12 @@
   left: 50%;
   z-index: 30;
   padding: 5px 10px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--text-rgb) / 0.14);
   border-radius: 8px;
   font-size: 11.5px;
   line-height: 1.4;
-  color: rgb(255 255 255 / 0.72);
-  background: rgb(26 29 37 / 0.96);
+  color: rgb(var(--text-rgb) / 0.72);
+  background: rgb(var(--panel-rgb) / 0.96);
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.5);
   white-space: nowrap;
   opacity: 0;
@@ -275,34 +275,34 @@
 .director-agent-panel-bubble.is-user {
   align-self: flex-end;
   max-width: 86%;
-  border: 1px solid rgb(96 148 255 / 0.5);
-  background: rgb(77 143 248 / 0.22);
+  border: 1px solid rgb(var(--accent-hover-rgb) / 0.5);
+  background: rgb(var(--accent-rgb) / 0.22);
   color: rgb(var(--text-rgb));
 }
 
 .director-agent-panel-bubble.is-assistant {
   align-self: flex-start;
   max-width: 94%;
-  border: 1px solid rgb(255 255 255 / 0.09);
-  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(var(--text-rgb) / 0.09);
+  background: rgb(var(--text-rgb) / 0.06);
   color: rgb(var(--text-rgb));
 }
 
 .director-agent-panel-bubble.is-error {
   align-self: flex-start;
   max-width: 94%;
-  border: 1px solid rgba(248, 113, 113, 0.5);
-  background: rgba(127, 29, 29, 0.18);
-  color: #fca5a5;
+  border: 1px solid rgb(var(--danger-rgb) / 0.5);
+  background: rgb(var(--danger-rgb) / 0.18);
+  color: rgb(var(--danger-rgb));
 }
 
 .director-agent-panel-tool {
   display: flex;
   flex-direction: column;
   align-self: stretch;
-  border: 1px solid rgb(255 255 255 / 0.1);
+  border: 1px solid rgb(var(--text-rgb) / 0.1);
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.035);
+  background: rgb(var(--text-rgb) / 0.035);
 }
 
 .director-agent-tool-row {
@@ -322,11 +322,11 @@
 
 .director-agent-tool-icon {
   flex-shrink: 0;
-  color: rgb(74 222 128);
+  color: rgb(var(--success-rgb));
 }
 
 .director-agent-panel-tool.is-error .director-agent-tool-icon {
-  color: rgb(248 113 113);
+  color: rgb(var(--danger-rgb));
 }
 
 .director-agent-tool-label {
@@ -346,11 +346,11 @@
 .director-agent-tool-status {
   flex-shrink: 0;
   font-size: 11px;
-  color: rgb(74 222 128);
+  color: rgb(var(--success-rgb));
 }
 
 .director-agent-tool-status.is-failed {
-  color: #fca5a5;
+  color: rgb(var(--danger-rgb));
 }
 
 .director-agent-tool-summary {
@@ -376,15 +376,15 @@
   flex-direction: column;
   gap: 2px;
   margin: 0 10px 10px;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 13px;
-  background: rgb(255 255 255 / 0.04);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  background: rgb(var(--text-rgb) / 0.04);
+  box-shadow: inset 0 1px 0 rgb(var(--text-rgb) / 0.04);
   transition: border-color 0.16s ease;
 }
 
 .director-agent-panel-composer:focus-within {
-  border-color: rgb(255 255 255 / 0.22);
+  border-color: rgb(var(--text-rgb) / 0.22);
 }
 
 .director-agent-panel-composer-bar {
@@ -414,10 +414,10 @@
   flex-direction: column;
   gap: 16px;
   width: 248px;
-  border: 1px solid rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(var(--text-rgb) / 0.08);
   border-radius: 12px;
   padding: 16px 18px 18px;
-  background: rgb(9 12 20 / 0.96);
+  background: rgb(var(--panel-rgb) / 0.96);
   box-shadow: 0 18px 44px rgb(0 0 0 / 0.6);
   backdrop-filter: blur(22px) saturate(150%);
   -webkit-backdrop-filter: blur(22px) saturate(150%);
@@ -462,7 +462,7 @@
 
 .director-agent-model-trigger:hover,
 .director-agent-model-trigger[aria-expanded="true"] {
-  background: rgb(255 255 255 / 0.08);
+  background: rgb(var(--text-rgb) / 0.08);
 }
 
 .director-agent-model-label {
@@ -494,10 +494,10 @@
   max-height: 190px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 12px;
   padding: 3px;
-  background: rgb(12 18 34 / 0.92);
+  background: rgb(var(--panel-rgb) / 0.92);
   box-shadow: 0 14px 40px rgb(0 0 0 / 0.55);
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
@@ -509,7 +509,7 @@
 
 .director-agent-model-menu::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.14);
+  background: rgb(var(--text-rgb) / 0.14);
 }
 
 .director-agent-panel .director-agent-model-option {
@@ -534,12 +534,12 @@
 
 .director-agent-model-option:hover {
   color: rgb(var(--text-rgb));
-  background: rgb(255 255 255 / 0.08);
+  background: rgb(var(--text-rgb) / 0.08);
 }
 
 .director-agent-model-option.is-selected {
-  color: rgb(150 190 255);
-  background: rgb(77 143 248 / 0.18);
+  color: rgb(var(--accent-rgb));
+  background: rgb(var(--accent-rgb) / 0.18);
 }
 
 .director-agent-model-empty {
@@ -590,18 +590,18 @@
   height: 32px;
   flex-shrink: 0;
   margin-left: 4px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--text-rgb) / 0.14);
   border-radius: 50%;
   color: rgb(var(--text-rgb));
-  background: rgb(255 255 255 / 0.12);
+  background: rgb(var(--text-rgb) / 0.12);
   cursor: pointer;
   transition: background-color 0.16s ease, opacity 0.16s ease;
 }
 
 .director-agent-panel-send:hover:not(:disabled) {
-  background: rgb(77 143 248 / 0.85);
-  border-color: rgb(96 148 255 / 0.5);
-  color: #fff;
+  background: rgb(var(--accent-rgb) / 0.85);
+  border-color: rgb(var(--accent-hover-rgb) / 0.5);
+  color: rgb(var(--on-accent-rgb));
 }
 
 .director-agent-panel-send:hover {
@@ -778,7 +778,7 @@
   width: 48px;
   height: 48px;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(var(--text-rgb) / 0.14);
   border-radius: 8px;
 }
 
@@ -805,13 +805,13 @@
 }
 
 .director-agent-attachment-remove:hover {
-  background: rgb(248 113 113 / 0.85);
+  background: rgb(var(--danger-rgb) / 0.85);
 }
 
 .director-agent-attach-error {
   padding: 0 2px 6px;
   font-size: 11px;
-  color: #fca5a5;
+  color: rgb(var(--danger-rgb));
 }
 
 /* 用户气泡内的图片缩略图 */
@@ -825,7 +825,7 @@
 .director-agent-bubble-image {
   max-width: 150px;
   max-height: 110px;
-  border: 1px solid rgb(255 255 255 / 0.16);
+  border: 1px solid rgb(var(--text-rgb) / 0.16);
   border-radius: 8px;
   object-fit: cover;
 }
@@ -840,9 +840,9 @@
 .director-agent-preview {
   margin: 0;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(var(--text-rgb) / 0.12);
   border-radius: 10px;
-  background: rgb(0 0 0 / 0.3);
+  background: rgb(var(--text-rgb) / 0.04);
 }
 
 .director-agent-preview img {
@@ -856,8 +856,8 @@
 .director-agent-preview figcaption {
   padding: 4px 10px;
   font-size: 10.5px;
-  color: rgb(255 255 255 / 0.45);
-  border-top: 1px solid rgb(255 255 255 / 0.08);
+  color: rgb(var(--text-rgb) / 0.45);
+  border-top: 1px solid rgb(var(--text-rgb) / 0.08);
 }
 
 /* 拖动预览遮罩：拖动接近左/右边缘时，显示与松手后停靠面板同尺寸的幽灵预览（宽度由内联样式取 layout.width） */

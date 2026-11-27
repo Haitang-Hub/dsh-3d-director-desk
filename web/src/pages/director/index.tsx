@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDownToLine, ArrowLeft, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, MousePointer2, Pencil, Plus, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowDownToLine, ArrowLeft, BookOpen, Check, FolderOpen, Hand, HardDrive, Keyboard, Moon, MousePointer2, Pencil, Plus, Sparkles, Sun, Trash2, Upload } from "lucide-react";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { probeDirectorBridge } from "./editor/hooks/use-director-agent-bridge";
 
@@ -118,6 +118,7 @@ const HOME_PROJECT_MANAGEMENT = [
 export default function DirectorHelpPage() {
   const navigate = useNavigate();
   const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   // AI 桥（director-mcp）在线状态：null = 探测中
   const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null);
 
@@ -151,6 +152,15 @@ export default function DirectorHelpPage() {
             <ArrowLeft aria-hidden="true" size={17} />
             回到导演台
           </button>
+          <button
+            className="director-home-back director-home-theme-toggle"
+            type="button"
+            aria-label={theme === "dark" ? "切换到浅色主题" : "切换到深色主题"}
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
+            {theme === "dark" ? "浅色" : "深色"}
+          </button>
           <section className="director-home-hero">
             <div>
               <p className="director-home-kicker">3D Director Desk · Help</p>
@@ -169,8 +179,8 @@ export default function DirectorHelpPage() {
                   fontSize: 13,
                   padding: "3px 10px",
                   borderRadius: 999,
-                  border: `1px solid ${bridgeOnline ? "#16a34a55" : "#9ca3af44"}`,
-                  color: bridgeOnline ? "#16a34a" : "#9ca3af",
+                  border: `1px solid color-mix(in srgb, ${bridgeOnline ? "var(--dsw-alias-state-success-primary)" : "var(--dsw-alias-label-tertiary)"} 40%, transparent)`,
+                  color: bridgeOnline ? "var(--dsw-alias-state-success-primary)" : "var(--dsw-alias-label-tertiary)",
                   userSelect: "none",
                 }}
               >
